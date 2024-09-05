@@ -1,0 +1,2232 @@
+---
+title: "Supplementary figures"
+author: "SLL, PPM, ANMK"
+date: "June 2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(lemon)
+library(slider)
+library(Hmisc) # for mean cl normal which gives confidence intervals
+library(tidyverse)
+library(cowplot)
+library(MetBrewer)
+library(MexBrewer)
+library(ggpubr)
+library(viridis)
+library(RColorBrewer)
+library(ggh4x)
+library(oce)
+library(ggrepel)
+#library(feathers)
+library(PNWColors)
+library(tidyverse)
+library(readxl)
+library(scales)
+library(Hmisc)
+```
+
+## Load data
+
+```{r}
+## change time to date
+start_sims <- as.Date("2020-03-15", "%Y-%m-%d") 
+start_booster <- start_sims + 839
+
+## WHO data ##
+start <- as.Date("2020-01-03", "%Y-%m-%d")
+
+dataWHO <- read_csv("../Data/WHO_cases/WHO-COVID-19-global-data.csv") %>% 
+  filter(Country %in% c("Ecuador", "India", "Malaysia")) %>% 
+  arrange(Date_reported) %>% 
+  select(Date_reported, Country, New_cases, Cumulative_deaths) %>% 
+  mutate(population = case_when(
+    Country == "Ecuador" ~ 15735139,
+    Country == "Malaysia" ~ 28552712,
+    Country == "India"~ 1155561222
+  )) %>% 
+  mutate(infs_perc = New_cases/population,
+         deaths_perc = Cumulative_deaths/population)
+
+## get ABM seed populations for each country ##
+pop_ABM <- read_csv("../Data/ABM_Parameters_Data/Grid_Param.csv") %>% select(Name, child, adult, old) %>% 
+  summarise(Name,start_pop = 2*(child + adult+ old)) %>% 
+  distinct() %>% 
+  arrange(Name) %>% 
+  rename(country = Name)
+
+dataAll <- read_csv("../Data/ABM Main Runs/dataAll.csv")%>% 
+  left_join(pop_ABM) %>%
+  group_by(ID_runs, time) %>% 
+  filter(cum_sum_Inf == max(cum_sum_Inf)) %>%
+  ungroup() %>%
+  mutate(time = start_sims + time) ## take out this line to get back to days instead of dates 
+```
+
+
+```{r}
+## protection grids ##
+
+serotypes <- read_csv("../Data/ABM_Parameters_Data/paramScale_MonOm.csv")
+
+
+## outputs of model ##
+
+
+
+
+dataHistories <- read_csv("../Data/ABM Main Runs/dataHistories.csv") 
+
+dataHistories899 <- read_csv("../Data/ABM Main Runs/dataHistories899.csv")
+
+
+## supp1 - slow booster rollout, comparable to first vaccine intervention
+data_supp1_slow_rollout <- read_csv("../Data/ABM Supplement/supp1-slow_rollout/dataAll.csv")%>% 
+  left_join(pop_ABM) %>% 
+  group_by(ID_runs, time) %>% 
+  filter(cum_sum_Inf == max(cum_sum_Inf)) %>%
+  ungroup() %>% 
+  mutate(time = start_sims + time) ## take out this line to get back to days instead of dates 
+
+## supp2 - vaccinating through Omicron*
+data_supp2_vaccine_star<- read_csv("../Data/ABM Supplement/supp2-vaccine_star/dataAll.csv")%>% 
+  left_join(pop_ABM) %>%
+  group_by(ID_runs, time) %>% 
+  filter(cum_sum_Inf == max(cum_sum_Inf)) %>%
+  ungroup() %>% 
+  mutate(time = start_sims + time) ## take out this line to get back to days instead of dates 
+
+## supp3 - "same efficacy" booster scenario
+data_supp3_same_efficacy<- read_csv("../Data/ABM Supplement/supp3-same_efficacy/dataAll.csv")%>% 
+  left_join(pop_ABM) %>%
+  group_by(ID_runs, time) %>% 
+  filter(cum_sum_Inf == max(cum_sum_Inf)) %>%
+  ungroup() %>% 
+  mutate(time = start_sims + time) ## take out this line to get back to days instead of dates 
+
+## supp4 - "same endpoint" booster scenario
+data_supp4_same_endpoint<- read_csv("../Data/ABM Supplement/supp4-same_endpoint/dataAll.csv")%>% 
+  left_join(pop_ABM) %>%
+  group_by(ID_runs, time) %>% 
+  filter(cum_sum_Inf == max(cum_sum_Inf)) %>%
+  ungroup() %>% 
+  mutate(time = start_sims + time) ## take out this line to get back to days instead of dates 
+
+
+## supp5 - Malaysia boosting
+data_supp5_boost_Malaysia<- read_csv("../Data/ABM Supplement/supp5-boost_like_Malaysia/dataAll.csv")%>% 
+  left_join(pop_ABM) %>% 
+  group_by(ID_runs, time) %>% 
+  filter(cum_sum_Inf == max(cum_sum_Inf)) %>%
+  ungroup() %>% 
+  mutate(time = start_sims + time) ## take out this line to get back to days instead of dates 
+
+```
+
+
+### S1: WHO case data
+
+#### Plot cases
+```{r}
+plot_real_cases <- dataWHO %>% 
+  mutate(time = as.Date(Date_reported, "%Y-%m-%d")) %>%
+  filter(time < start_sims + 900) %>%
+  group_by(Country) %>% 
+  mutate(infs10K=10000*infs_perc) %>%
+  mutate(infs10K = slide_index_mean(infs10K, time, after = 7)) %>%
+  #mutate(infs = despike(infs, reference = "median"), k = 7) %>% # smooth over a 7 day rolling median window
+  ungroup() %>%
+  #mutate(months = time/30) %>%
+  ggplot(aes(x = time, y = infs10K, color = Country)) + 
+  geom_line(size = 0.8) + theme_minimal() +
+  facet_wrap(~Country, scales = "free") +
+  scale_color_manual("Country", 
+      values = c("#05878a", "#5a175d", "#dd9933")) + 
+  scale_y_continuous("Confirmed new cases per 10,000") +
+  #scale_x_continuous("Time (months)") +
+  scale_x_date("Date", expand = c(0,0), date_breaks = "3 month", date_labels =  "%b %Y") + 
+  geom_vline(aes(xintercept = 840/30), size = 1, color = "blue") +
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.text.x=element_text(angle=60, hjust=1),
+        axis.title = element_text(size = 12, color = "black"),
+        axis.line = element_line(color = "black"),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        #plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        legend.position = "none",
+        strip.text = element_text(colour = "black", size = 12, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        #panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.5, "cm")) + # , aspect.ratio=1) + 
+  ggtitle("WHO confirmed cases")
+plot_real_cases
+```
+
+#### Save
+```{r}
+ggsave("../Supplement_June2024/FigS1.pdf", plot_real_cases, 
+       height = 4, width = 12)
+```
+
+
+### S2: Pre-omicron infections
+
+#### Data 
+Infections plot - this code duplicates the no booster scenario so that it appears as a comparison across all panels
+
+```{r}
+data_infections_WT <- dataAll %>% 
+  filter(vaccine_star == "no", boost_shape == "functional", speed=="fast") %>%
+  filter(scenario %in% c("WTpenalty", "WTendpoint", "WTefficacy")) %>% 
+  filter(booster == "Monovalent") %>% 
+  mutate(booster = "Monovalent (WT)")
+
+data_infections_Om <- dataAll %>% 
+  filter(vaccine_star == "no", boost_shape == "functional", speed=="fast") %>%
+  filter(scenario %in% c("Ompenalty", "Omendpoint", "Omefficacy")) %>% 
+  filter(booster == "Monovalent") %>% 
+  mutate(booster = "Monovalent (Omicron)")
+
+data_infections_Biv <- dataAll%>% 
+  filter(vaccine_star == "no", boost_shape == "functional", speed=="fast") %>%
+  filter(booster == "Bivalent")
+
+data_infections_NoBoost_penalty <- dataAll %>% 
+  filter(vaccine_star == "no", boost_shape == "no booster") %>%
+  mutate(scenario = "penalty")%>% 
+  mutate(booster = "No booster")
+
+
+data_infections2_preOm <- rbind(data_infections_WT, data_infections_Om) %>%
+  rbind(data_infections_Biv) %>%
+  rbind(data_infections_NoBoost_penalty)
+
+rm(data_infections_WT, data_infections_Om,
+   data_infections_Biv,data_infections_NoBoost_penalty)
+
+gc()
+```
+
+
+```{r}
+colors <- c("#0D3660","#BC8400","#7C2529", "#005B40")
+
+dataS2 <- data_infections2_preOm %>% 
+  filter(time < start_sims + 900) %>%
+  mutate(SAR = recode(SAR, `0.427` = "100%",
+    `0.4697` = "110%", `0.5551` = "130%")) %>%
+  mutate(SAR = fct_relevel(SAR, c("100%", "110%", "130%"))) %>% 
+  mutate(Scenario = recode(scenario,
+    endpoint = "Same endpoint",efficacy = "Same efficacy",
+    penalty = "History dependent",WTpenalty = "History dependent",
+    Ompenalty = "History dependent", "no booster" = "No booster")) %>%
+  mutate(scenario = fct_relevel(Scenario, 
+       c("No booster", "Same endpoint",
+         "Same efficacy","History dependent"))) %>% 
+  mutate(booster = fct_relevel(booster, 
+       c("No booster","Monovalent (WT)",
+         "Monovalent (Omicron)", "Bivalent"))) %>% 
+  filter(scenario == "History dependent", SAR == "130%") %>%
+  mutate(inf10K = 10000*infections_over_time/start_pop) %>%
+  group_by(time,country,booster,scenario,SAR) %>%
+  summarise(x  = smean.cl.normal(inf10K), 
+            name = c("Mean","Lower","Upper")) %>% ungroup() %>%
+  pivot_wider(names_from = name, values_from = x)
+
+rm(data_infections2_preOm)
+gc()
+```
+
+
+#### Plot 
+
+```{r}
+S2 <- dataS2 %>%
+  mutate(country = case_when(
+    country == "Ecuador" ~ "Ecuador-like",
+    country == "India" ~ "India-like",
+    country == "Malaysia" ~ "Malaysia-like")) %>%
+  ggplot(aes(x = time, fill = booster, 
+            color = booster, linetype = SAR, 
+            group = interaction(country, scenario, booster, SAR))) +
+  geom_ribbon(aes(ymin = Lower, ymax = Upper), alpha = 0.5) + 
+  geom_line(aes(y=Mean), alpha = 0) + theme_minimal() + 
+  scale_fill_manual("Booster type", values = colors) +
+  scale_color_manual("Booster type", values = colors) + 
+  ylab("Infections per 10,000") +
+  geom_vline(xintercept = start_booster, linetype = "dashed") + 
+  #geom_vline(xintercept = 28, color="blue", linetype="solid", size=1.3) +
+  facet_rep_grid(country~booster) + #, strip.position = "right") +
+  #            axes = "all", remove_labels = "all") + 
+  scale_x_date("Date", expand = c(0,0), date_breaks = "4 month", 
+               date_labels =  "%b %Y") + 
+  labs(title = "Infections pre-Omicron*", 
+        subtitle = "History specific model") + #, "Variant-specific model") +
+  guides(linetype = guide_legend(override.aes = list(alpha = 1, fill=NA))) +
+  scale_linetype_manual("Infectiousness", values = c("solid","dashed")) +
+  theme(axis.text = element_text(size = 11, color = "black"),
+        #axis.title.x = element_text(size = 12, color = "black",vjust = -1),
+                axis.text.x=element_text(angle=60, hjust=1),
+        axis.title = element_text(size = 12, color = "black",vjust = +3),
+        axis.line = element_line(color = "black"),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        plot.title.position = "plot",
+        plot.margin = unit(c(t=0.3, r=0.3, b=0.3, l=0.3), "cm"),
+        legend.position = "top",
+        strip.text = element_text(colour = "black", size = 11, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        legend.margin=margin(t=0.8,r=0.5,b=0.2,l=0,unit = "line"),
+        legend.key.height= unit(0.4, 'cm'),
+        legend.key.width= unit(0.4, 'cm'),
+        legend.title = element_text(size = 11, color = "black"),
+        legend.text = element_text(size = 10, color = "black"),
+        panel.spacing = unit(0.5, "cm")) #, aspect.ratio=1,
+        #panel.grid.major = element_line(color = "grey95"),
+        #panel.grid.minor = element_line(color = "grey95")) 
+S2
+```
+
+#### Save
+```{r}
+ggsave("../Supplement_June2024/FigS2.pdf", S2, height =5.8, width = 12)
+```
+
+### S3: Vaccine + Booster curves
+
+#### Splines
+
+Vaccination function - splines
+```{r}
+rm(dataAll)
+gc()
+
+
+type_III_resp <- function (t, Vmax, WVH, k) {
+  
+  return(Vmax*(t^k)/((WVH^k) + (t^k)))
+}
+
+vacc_weekly <- function (Vmax, WVH, k, country, SES){
+  datOut <- tibble(Week = 1:157, Vac = type_III_resp(1:157, Vmax,WVH, k)) %>%
+    mutate(dailyVac =  c(Vac[1],diff(Vac)),
+           VacCumSum = cumsum(dailyVac)) %>% 
+    arrange(Week) %>%
+    mutate(Day = Week*7-7+1, dailyVac=dailyVac/7, country = country, SES = SES)
+  return(datOut)
+}
+```
+
+#### Get trends
+```{r}
+
+#### Slow trends ####
+vacc_low_India <- vacc_weekly(0.7833, 32.06, 2.54, "India", "Low")
+vacc_high_India <- vacc_weekly(0.9279, 23.42, 2.83, "India", "High") %>% 
+  rbind(vacc_low_India)
+rm(vacc_low_India)
+  
+vacc_low_Ecuador <- vacc_weekly(0.7872, 30.57, 3.87, "Ecuador", "Low")%>% 
+  rbind(vacc_high_India)
+rm(vacc_high_India)
+vacc_high_Ecuador <- vacc_weekly(1, 24.49, 3.05, "Ecuador", "High") %>% 
+  rbind(vacc_low_Ecuador)
+rm(vacc_low_Ecuador)
+  
+vacc_low_Malaysia <-vacc_weekly(0.7171, 21.28, 4.97, "Malaysia", "Low") %>% 
+  rbind(vacc_high_Ecuador)
+rm(vacc_high_Ecuador)
+vacc_high_Malaysia <-vacc_weekly(0.9654, 19.92, 5.50, "Malaysia", "High") %>% 
+  rbind(vacc_low_Malaysia)
+rm(vacc_low_Malaysia)
+
+vacc_full <- vacc_high_Malaysia
+rm(vacc_high_Malaysia)
+
+vacc_truncate <- vacc_full %>% filter(Day <= 600) %>% filter(Day == max(Day)) %>% 
+  select(country, SES, day596 = VacCumSum)
+
+vacc_full <- vacc_full %>% left_join(vacc_truncate, by=c("country", "SES"))
+```
+
+#### Observed data
+```{r}
+## vaccine trends ##
+
+dataTexampAll <- read_csv("../Data/vaccine_trends/dataTexampAll.csv") %>%
+  filter(Name %in% c("India", "Ecuador","Malaysia"))
+
+vax_fit <- dataTexampAll %>% 
+  #filter(type == "predicted") %>% 
+  pivot_longer(H:L, names_to = "SES", values_to = "vaccinated") %>% 
+  mutate(vaccinated = 100*vaccinated) %>%
+  filter(week*7 < 600) %>%
+  ggplot(aes(x= week*7, y = vaccinated)) +
+  geom_line(data=. %>% filter(type == "predicted") %>% rename(Fit = SES), 
+            aes(linetype = Fit, color = Name), size = 1) + 
+  geom_point(data=. %>% filter(type == "observed") %>% rename(Observed = SES), 
+          aes(shape = Observed, color = Name), size = 0.9, alpha = 0.5) +
+  scale_y_continuous("First-dose Vaccinated (%)", limits = c(0,100)) +
+  scale_x_continuous("Days since vaccination started", limits = c(0,930-320), labels = c(0,100,200,300,400,500,600), breaks = c(0,100,200,300,400,500,600)) +
+  ggtitle("Observed vaccination","Primary series") +
+  scale_color_manual("Country", values = c("#05878a", "#5a175d", "#dd9933")) + 
+  theme_minimal() +
+      geom_vline(xintercept = 900-320, color="red", linetype="solid", size=1.3) +
+  #facet_wrap(~Name) +
+  guides(shape = guide_legend(override.aes = list(size=0.8, alpha = 0.6)), 
+         color = guide_legend(order = 1)) + 
+    theme(axis.text = element_text(size = 14, color = "black"),
+        axis.title = element_text(size = 14, color = "black"),
+        axis.line = element_line(color = "black"),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 15, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 13),
+        #plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        legend.position = "right",
+        legend.title = element_text(size = 14, color = "black"),
+        legend.text = element_text(size = 13, color = "black"),
+        strip.text = element_text(colour = "black", size = 14, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        panel.spacing = unit(0.5, "cm")) #, aspect.ratio=0.3)
+vax_fit
+  
+```
+
+#### model vaccination - main text
+```{r}
+vax_trends_model <- read_csv("../Data/ABM Main Runs/dataAll.csv") %>% 
+  left_join(pop_ABM) %>% group_by(ID_runs, time) %>% 
+  filter(cum_sum_Inf == max(cum_sum_Inf)) %>%
+  ungroup() %>% filter(scenario == "no booster", vaccine_star == "no") %>% 
+  group_by(country, time) %>% 
+  summarise(vaccinated = 100*mean(vaccinated_over_time/start_pop)) %>% 
+  ungroup() %>% filter(time >= 320, time < 900) %>% 
+  mutate(time = time - 320) %>% mutate(time = time) %>% 
+  mutate(country = case_when(
+    country == "Ecuador" ~ "Ecuador-like",
+    country == "India" ~ "India-like",
+    country == "Malaysia" ~ "Malaysia-like")) %>%
+  ggplot(aes(x = time, y = vaccinated, group = interaction(country))) + 
+  geom_line(aes(color = country), size = 1) + theme_minimal() + 
+  geom_vline(xintercept = 900-320, color="red", linetype="solid", size=1.3) +
+  scale_color_manual("Country", values = c("#05878a", "#5a175d", "#dd9933")) + 
+  scale_y_continuous("Vaccinated (%)", limits = c(0,100)) +
+  scale_x_continuous("Days since vaccination started", limits = c(0,820),
+                     breaks = c(0,200,400,600,800)) +
+  ggtitle("HSM vaccination rates","Main text")+
+  guides(shape = guide_legend(override.aes = list(size=0.8, alpha = 0.6)), 
+         color = guide_legend(order = 1)) + 
+    theme(axis.text = element_text(size = 14, color = "black"),
+        axis.title = element_text(size = 14, color = "black"),
+        axis.line = element_line(color = "black"),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 15, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 13),
+        #plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        legend.position = "none",
+        legend.title = element_text(size = 14, color = "black"),
+        legend.text = element_text(size = 13, color = "black"),
+        strip.text = element_text(colour = "black", size = 14, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        panel.spacing = unit(0.5, "cm")) #, aspect.ratio=1)
+vax_trends_model
+
+```
+
+#### model vaccinated through end
+```{r}
+vax_trends_model_star <- read_csv("../Data/ABM Supplement/supp2-vaccine_star/dataAll.csv")%>% 
+  left_join(pop_ABM) %>%
+  group_by(ID_runs, time) %>% 
+  filter(cum_sum_Inf == max(cum_sum_Inf)) %>%
+  ungroup() %>%  
+  filter(scenario == "no booster") %>%
+  group_by(country, time) %>% 
+    summarise(vaccinated = 100*mean(vaccinated_over_time/start_pop)) %>%
+  ungroup() %>% 
+  filter(time >= 320, time < 1095) %>% 
+  mutate(time = time - 320) %>% 
+  mutate(time = time) %>% 
+  mutate(country = case_when(
+    country == "Ecuador" ~ "Ecuador-like",
+    country == "India" ~ "India-like",
+    country == "Malaysia" ~ "Malaysia-like"
+  )) %>%
+  ggplot(aes(x = time, y = vaccinated, group = interaction(country))) + 
+  geom_line(aes(color = country), size = 1) + 
+    geom_vline(xintercept = 900-320, color="red", linetype="solid", size=1.3) +
+  #facet_grid(~country)+ 
+  theme_minimal() + 
+  scale_color_manual("Country", values = c("#05878a", "#5a175d", "#dd9933")) + 
+  scale_y_continuous("Vaccinated (%)", limits = c(0,100)) +
+  scale_x_continuous("Days since vaccination started", 
+                     limits = c(0,820), breaks = c(0,200,400,600, 800)) +
+  ggtitle("HSM vaccination rates", "Continue through Omicron*")+
+  guides(shape = guide_legend(override.aes = list(size=0.8, alpha = 0.6)), 
+         color = guide_legend(order = 1)) + 
+    theme(axis.text = element_text(size = 14, color = "black"),
+        axis.title = element_text(size = 14, color = "black"),
+        axis.line = element_line(color = "black"),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 15, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 13),
+        #plot.margin = unit(c(1, 1, 1, 1), "cm"),
+        legend.position = "none",
+        legend.title = element_text(size = 14, color = "black"),
+        legend.text = element_text(size = 13, color = "black"),
+        strip.text = element_text(colour = "black", size = 14, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        panel.spacing = unit(0.5, "cm")) #, aspect.ratio=1)
+vax_trends_model_star
+
+```
+
+
+#### Model boosting - main text
+```{r}
+boost_trends_model <- read_csv("../Data/ABM Main Runs/dataAll.csv")%>% 
+  left_join(pop_ABM) %>%
+  group_by(ID_runs, time) %>% 
+  filter(cum_sum_Inf == max(cum_sum_Inf)) %>%
+  ungroup()  %>% 
+  filter(SAR == 1.3*0.427, scenario == "penalty", boost_shape == "functional") %>% 
+  group_by(country, SAR, scenario, booster, boost, time) %>% 
+  summarise(boosted = 100*mean(boosted_over_time/(vaccinated_over_time))) %>% 
+  ungroup() %>% 
+  filter(time >= 840) %>% 
+  mutate(time = time - 840) %>% 
+  
+  mutate(country = case_when(
+    country == "Ecuador" ~ "Ecuador-like",
+    country == "India" ~ "India-like",
+    country == "Malaysia" ~ "Malaysia-like"
+  )) %>%
+  ggplot(aes(x = time, y = boosted, group = interaction(country, scenario,boost, booster))) + 
+  geom_line(aes(color = country), size = 1) + 
+  #facet_grid(~country)+ 
+  theme_minimal() + 
+      geom_vline(xintercept = 900-840, color="red", linetype="solid", size=1.3) +
+  scale_color_manual("Country", values = c("#05878a", "#5a175d", "#dd9933")) + 
+  scale_y_continuous("Boosted (% of vaccinated)", limits = c(0,100)) +
+  scale_x_continuous("Days since boosting started") +
+  ggtitle("HSM boosting","Main text") +
+  guides(shape = guide_legend(override.aes = list(size=0.8, alpha = 0.6)), 
+         color = guide_legend(order = 1)) + 
+    theme(axis.text = element_text(size = 14, color = "black"),
+        axis.title = element_text(size = 14, color = "black"),
+        axis.line = element_line(color = "black"),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 15, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 13),
+        #plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        legend.position = "none",
+        legend.title = element_text(size = 14, color = "black"),
+        legend.text = element_text(size = 13, color = "black"),
+        strip.text = element_text(colour = "black", size = 14, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        panel.spacing = unit(0.5, "cm")) #, aspect.ratio=1)
+boost_trends_model
+
+```
+
+#### Model boosting - conservative
+```{r}
+boost_trends_model_conservative <- read_csv("../Data/ABM Supplement/supp1-slow_rollout/dataAll.csv")%>% 
+  left_join(pop_ABM) %>% 
+  group_by(ID_runs, time) %>% 
+  filter(cum_sum_Inf == max(cum_sum_Inf)) %>%
+  ungroup()  %>% 
+  filter(SAR == 1.3*0.427, scenario == "penalty", boost_shape == "functional") %>% 
+  group_by(country, SAR, scenario, booster, boost, time) %>% 
+  summarise(boosted = 100*mean(boosted_over_time/(vaccinated_over_time))) %>% 
+  ungroup() %>% 
+  filter(time >= 840) %>% 
+  mutate(time = time - 840) %>% 
+  
+  mutate(country = case_when(
+    country == "Ecuador" ~ "Ecuador-like",
+    country == "India" ~ "India-like",
+    country == "Malaysia" ~ "Malaysia-like"
+  )) %>%
+  ggplot(aes(x = time, y = boosted, group = interaction(country, scenario,boost, booster))) + 
+  geom_line(aes(color = country), size = 1) + theme_minimal() + 
+  geom_vline(xintercept = 900-840, color="red", linetype="solid", size=1.3) +
+  scale_color_manual("Country", values = c("#05878a", "#5a175d", "#dd9933")) + 
+  scale_y_continuous("Boosted (% of vaccinated)", limits = c(0,100)) +
+  scale_x_continuous("Days since boosting started") +
+  ggtitle("HSM boosting", "Conservative rollout speed") +
+  guides(shape = guide_legend(override.aes = list(size=0.8, alpha = 0.6)), 
+         color = guide_legend(order = 1)) + 
+  theme(axis.text = element_text(size = 14, color = "black"),
+        axis.title = element_text(size = 14, color = "black"),
+        axis.line = element_line(color = "black"),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 15, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 13),
+        #plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        legend.position = "none",
+        legend.title = element_text(size = 14, color = "black"),
+        legend.text = element_text(size = 13, color = "black"),
+        strip.text = element_text(colour = "black", size = 14, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        panel.spacing = unit(0.5, "cm")) #, aspect.ratio=1)
+boost_trends_model_conservative
+
+```
+
+#### Save
+```{r}
+rightPlot <- plot_grid(vax_trends_model, vax_trends_model_star,
+                       boost_trends_model, boost_trends_model_conservative, 
+                       labels = c("B", "C", "D", "E"), nrow = 2)
+
+S3 <- plot_grid(vax_fit, rightPlot, labels = c("A",""), 
+                nrow = 1, rel_widths = c(1.2,1))
+
+ggsave("../Supplement_June2024/FigS3.pdf", S3, height = 6, width = 15)
+```
+
+### S4: ABM histories
+```{r}
+rm(list = ls())
+gc()
+
+dataHistories <- read_csv("../Data/ABM Main Runs/dataHistories.csv") 
+
+datHistBar <-dataHistories %>% 
+  filter(time == max(time)) %>%
+  #filter(time >= 21*30) %>% filter(time == min(time)) %>% ## december 2021
+  mutate(history_counts = round(history_counts, 1)) %>%
+  mutate(history_types= recode(history_types,
+                               WT_vaccine = "WT + vaccine",
+                               Delta_vaccine = "Delta + vaccine",
+                               Omicron_vaccine = "Omicron + vaccine",
+                               two = "Two events, other",
+                               three = "Three events, other",
+                               four = "Four or more immune events")) %>%
+  mutate(history_types = fct_relevel(
+    history_types, c("Naive", "Vaccine","Vaccine + booster",
+      "WT", "WT + vaccine", "WT + vaccine + booster",
+      "Delta", "Delta + vaccine", "Delta + vaccine + booster",
+      "Omicron", "Omicron + vaccine", "Omicron + vaccine + booster",
+      "Omicron*", "Omicron* + vaccine", "Omicron* + vaccine + booster",
+      "Two events, other", "Three events, other", 
+      "Four or more immune events")))
+```
+
+#### Plot
+
+```{r}
+
+colors <- c("#4B859F", "#0D3660","#6E8740", "#005B40", "#EE8768", 
+            "#BD451D", "#E18A8D", "#7C2529",
+            "#DFB81F", "#BC8400", "#6e500c")
+
+S4 <- datHistBar %>%
+  mutate(country = case_when(
+    country == "Ecuador" ~ "Ecuador-like",
+    country == "India" ~ "India-like",
+    country == "Malaysia" ~ "Malaysia-like"
+  )) %>%
+  pivot_wider(names_from = name, values_from = history_counts) %>%
+  ggplot(aes(x = country, fill = history_types, color= history_types)) +
+  geom_bar(aes(y=Mean), stat="identity", position=position_dodge(0.7),  
+           alpha=0.5, size = 0.6, width = 0.6) + theme_classic() +
+  geom_errorbar(aes(ymin  = Lower, ymax  = Upper),
+                stat="identity", position=position_dodge(0.7),  
+                size = 0.6, width = 0.3, show.legend=FALSE) + 
+  scale_y_continuous("History prevalence (%)", 
+                     limits = c(0, 45), expand = c(0,0)) +
+  scale_x_discrete("Country", expand = c(0.12,0.12)) + 
+  scale_fill_manual("Immune history", values = colors) + 
+  scale_color_manual("Immune history", values = colors) +
+  guides(color = guide_legend(nrow = 3), fill = guide_legend(nrow = 2)) +  
+  theme_minimal() + theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title.y = element_text(size = 12, color = "black"),
+        axis.title.x = element_text(size = 12, color = "black", vjust = -0.75),
+        axis.line = element_line(color = "black"),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.title.position = "plot",
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        plot.margin = unit(c(0.1, 0.1, 0.1, 0.1), "cm"),
+        legend.position = "bottom",
+        legend.key.size = unit(0.5, 'cm'), 
+        legend.text = element_text(size = 9, color = "black"),
+        legend.margin=margin(1,0.5,0.5,0.5,unit = "line"),
+        strip.text = element_text(colour = "black", size = 10.5, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        panel.spacing = unit(0.5, "cm"), aspect.ratio=0.2)
+S4
+```
+
+#### Save 
+```{r}
+ggsave("../Supplement_June2024/FigS4.pdf", S4, width = 10, height = 4)
+rm(datHistBar, dataHistories)
+```
+
+
+### S7: HSM Compare absolute vs. relative benefits 
+#### Data
+```{r}
+## get ABM seed populations for each country ##
+pop_ABM <- read_csv("../Data/ABM_Parameters_Data/Grid_Param.csv") %>% select(Name, child, adult, old) %>% 
+  summarise(Name,start_pop = 2*(child + adult+ old)) %>% 
+  distinct() %>% 
+  arrange(Name) %>% 
+  rename(country = Name)
+
+## change time to date
+start_sims <- as.Date("2020-03-15", "%Y-%m-%d") 
+
+dataAll <- read_csv("../Data/ABM Main Runs/dataAll.csv")%>% 
+  left_join(pop_ABM) %>%
+  group_by(ID_runs, time) %>% 
+  filter(cum_sum_Inf == max(cum_sum_Inf)) %>%
+  ungroup() %>%
+  mutate(time = start_sims + time) ## take out this line to get back to days instead of dates 
+```
+
+```{r}
+df_compare <-  dataAll %>% 
+  filter(boost == "no", vaccine_star == "no") %>% 
+  filter(time >= start_sims + 900) %>% 
+  group_by(SAR, country, replicate) %>% 
+  mutate(deaths10K = 10000*deaths_over_time/start_pop) %>%
+  #mutate(deaths_high = max(deaths), deaths_low = min(deaths))
+  summarise(
+    death_compare_10K = max(deaths10K)-min(deaths10K)
+  ) %>%
+  ungroup()
+
+df_avert <- dataAll %>% 
+  filter(boost == "yes", vaccine_star == "no", boost_shape == "functional", speed=="fast") %>% 
+  #filter(time >= 900/365) %>% 
+  filter(time >= start_sims + 900) %>%
+  group_by(SAR, scenario, booster, country, replicate) %>% ## matching each booster scenario to a no booster scenario
+  mutate(deaths10K = 10000*deaths_over_time/start_pop) %>%
+  summarise(
+    deaths_10K = max(deaths10K, na.rm = T)-min(deaths10K, na.rm = T)
+  ) %>%
+  ungroup()
+
+df_avert_rr <- left_join(df_avert, df_compare, by = c("SAR", "country", "replicate")) %>%
+  group_by(SAR, country, booster, scenario, replicate) %>%
+  mutate(da10K = death_compare_10K-deaths_10K,
+         da_perc = da10K/death_compare_10K) %>%
+ungroup() %>%
+  select(
+    SAR, country, replicate, scenario = scenario, booster = booster, death_compare_10K, deaths_10K, da10K, da_perc)
+
+df_avert_rr_splitWT <- df_avert_rr %>% 
+  filter(scenario %in% c("WTpenalty", "WTendpoint", "WTefficacy")) %>% 
+  filter(booster == "Monovalent") %>% 
+  mutate(booster = "Monovalent (WT)")
+df_avert_rr_splitOm <- df_avert_rr %>% 
+  filter(scenario %in% c("Ompenalty", "Omendpoint", "Omefficacy")) %>% 
+  filter(booster == "Monovalent") %>% 
+  mutate(booster = "Monovalent (Omicron)")
+
+df_avert_rr2 <- df_avert_rr %>%
+  filter(booster == "Bivalent" | booster == "no booster" | booster == "No booster") %>%
+  rbind(df_avert_rr_splitWT) %>% 
+  rbind(df_avert_rr_splitOm)
+
+rm(df_avert_rr_splitOm, df_avert_rr_splitWT, dataAll)
+gc()
+```
+
+
+```{r}
+colors <- rev(c("#BCC07B", "#9A81B0"))
+
+plot_compare_omicron <- df_avert_rr2 %>% 
+  mutate(country = case_when(
+    country == "Ecuador" ~ "Ecuador-like",
+    country == "India" ~ "India-like",
+    country == "Malaysia" ~ "Malaysia-like")) %>%
+  group_by(country, booster, SAR) %>% 
+  summarise(da10K = mean(da10K)) %>% ungroup() %>% 
+  mutate(da10K = round(da10K, 2)) %>% 
+  pivot_wider(names_from = "booster", values_from = da10K) %>% 
+  mutate(om_rel = `Monovalent (Omicron)`/`Monovalent (WT)`,
+         om_abs = `Monovalent (Omicron)` - `Monovalent (WT)`,
+         biv_rel = `Bivalent`/`Monovalent (WT)`,
+         biv_abs = `Bivalent`- `Monovalent (WT)`) %>% 
+  mutate(SAR = recode(SAR,`0.427` = "100%",
+    `0.4697` = "110%", `0.5551` = "130%")) %>%
+  mutate(SAR = fct_relevel(SAR, c("100%", "110%", "130%"))) %>% 
+  rename(Country = country) %>%
+  ggplot(aes(x = om_rel, y = om_abs, color = SAR)) + 
+  geom_point(size = 3, aes(shape = Country)) + theme_minimal() + 
+  scale_color_manual("Infectiousness", values = colors) + 
+  scale_x_continuous("Relative benefit of deaths averted", 
+                     limits = c(0.6,1.2)) +
+  scale_y_continuous("Absolute benefit of deaths averted", 
+                     limits = c(-0.75,0.25)) + 
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title.x = element_text(size = 12, color = "black",vjust = -1),
+        axis.title.y = element_text(size = 11, color = "black",vjust = +3),
+        axis.line = element_line(color = "black"),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        plot.title.position = "plot",
+        plot.margin = unit(c(t=0.2, r=1, b=0.5, l=1.5), "cm"),
+        legend.position = "none",
+        strip.text = element_text(colour = "black", size = 11, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        panel.spacing = unit(0.5, "cm"), aspect.ratio=1) + 
+  ggtitle("Relative vs. Absolute Benefit","Monovalent (Omicron) - HSM")
+plot_compare_omicron
+```
+
+
+```{r}
+
+colors <- rev(c("#BCC07B", "#9A81B0"))
+
+plot_compare_bivalent <- df_avert_rr2 %>% 
+  mutate(country = case_when(
+    country == "Ecuador" ~ "Ecuador-like",
+    country == "India" ~ "India-like",
+    country == "Malaysia" ~ "Malaysia-like")) %>%
+  group_by(country, booster, SAR) %>% 
+  summarise(da10K = mean(da10K)) %>% ungroup() %>% 
+  mutate(da10K = round(da10K, 2)) %>% 
+  pivot_wider(names_from = "booster", values_from = da10K) %>% 
+  mutate(om_rel = `Monovalent (Omicron)`/`Monovalent (WT)`,
+         om_abs = `Monovalent (Omicron)` - `Monovalent (WT)`,
+         biv_rel = `Bivalent`/`Monovalent (WT)`,
+         biv_abs = `Bivalent`- `Monovalent (WT)`
+         ) %>% 
+  mutate(SAR = recode(SAR,`0.427` = "100%",
+    `0.4697` = "110%", `0.5551` = "130%")) %>%
+  mutate(SAR = fct_relevel(SAR, c("100%", "110%", "130%"))) %>% 
+  rename(Country = country) %>%
+  ggplot(aes(x = biv_rel, y = biv_abs, color = SAR)) + 
+  geom_point(size = 3, aes(shape = Country)) + 
+  scale_color_manual("Infectiousness", values = colors) + 
+  theme_minimal() + 
+  scale_x_continuous("Relative benefit of deaths averted", limits = c(1,1.85)) + 
+  scale_y_continuous("Absolute benefit of deaths averted", limits = c(0,1.5)) + 
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title.x = element_text(size = 12, color = "black",vjust = -1),
+        axis.title.y = element_text(size = 11, color = "black",vjust = +3),
+        axis.line = element_line(color = "black"),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        plot.title.position = "plot",
+        plot.margin = unit(c(t=0.2, r=1, b=0.5, l=1.5), "cm"),
+        legend.position = "none",
+        strip.text = element_text(colour = "black", size = 11, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        panel.spacing = unit(0.5, "cm"), aspect.ratio=1) + 
+  ggtitle("","Bivalent - HSM")
+plot_compare_bivalent
+
+```
+
+
+
+#### HIM Compare absolute vs. relative 
+```{r}
+
+df_comp_benefit_HIM <- read_csv("../Data/ODE Supplement/fast_total.csv") %>% 
+  mutate(country = case_when(
+    country == "Ecuador" ~ "Ecuador-like",
+    country == "India" ~ "India-like",
+    country == "Malaysia" ~ "Malaysia-like")) %>%
+  select(relativeFOI, boost.speed, country, 
+         boost.start.time, Booster, deathsaverted_per100k) %>% 
+  mutate(deathsaverted_10k = deathsaverted_per100k/10) %>%
+  filter(boost.speed == "fast", relativeFOI != "0% increase in FOI") %>% 
+  select(-boost.speed) %>% select(-boost.start.time) %>%
+  select(-deathsaverted_per100k) %>%
+  mutate(deathsaverted_10k = round(deathsaverted_10k, 2)) %>%
+  pivot_wider(names_from = "Booster", values_from = "deathsaverted_10k") %>% 
+  mutate(biv_abs = Bivalent - Monovalent,
+         biv_rel = Bivalent/Monovalent) %>% rename(Country = country) %>% 
+  mutate(relativeFOI = case_when(
+    relativeFOI == "10% increase in FOI" ~ "110%",
+    relativeFOI == "30% increase in FOI" ~ "130%")) %>%
+  ggplot(aes(x = biv_rel, y = biv_abs, color = relativeFOI)) +
+  geom_point(size = 3, aes(shape = Country)) +
+scale_color_manual("Infectiousness", values = colors) + 
+  #facet_wrap(~country)+ 
+  theme_minimal() + 
+  scale_x_continuous("Relative benefit of deaths averted", limits = c(1.2,2)) + 
+  scale_y_continuous("Absolute benefit of deaths averted", limits = c(0,0.42)) + 
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title.x = element_text(size = 12, color = "black",vjust = -1),
+        axis.title.y = element_text(size = 11, color = "black",vjust = +3),
+        axis.line = element_line(color = "black"),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        plot.title.position = "plot",
+        plot.margin = unit(c(t=0.2, r=1, b=0.5, l=1.5), "cm"),
+        strip.text = element_text(colour = "black", size = 11, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        panel.spacing = unit(0.5, "cm"), aspect.ratio=1) + 
+  ggtitle("","Bivalent - HIM")
+df_comp_benefit_HIM
+
+```
+
+
+```{r}
+plot_grid_compare_da <- plot_grid(plot_compare_omicron, 
+          plot_compare_bivalent, df_comp_benefit_HIM, 
+          nrow = 1, labels = c("A", "B", "C"), rel_widths = c(1, 1, 1.3))
+
+ggsave("../Supplement_June2024/FigS7.pdf", 
+       plot_grid_compare_da, height = 5*0.75, width = 18*0.75)
+```
+
+### S18: boosting, 60 days prior
+
+#### Data
+```{r}
+dataS18 <- read_csv("../Data/ODE Supplement/model_out_data_total.csv") %>%
+  mutate(relativeFOI = case_when(
+    relax == 0 ~ "100% infectiousness",
+    relax == 0.1 ~ "110% infectiousness",
+    relax == 0.3 ~ "130% infectiousness"
+  )) %>%
+  filter(relativeFOI == "130% infectiousness") %>%
+  filter(boost.start == "60") %>%
+  mutate(Speed = case_when(
+    boost.speed == "fast" ~ "Main text boosting",
+    boost.speed == "slow" ~ "Conservative boosting"
+  )) %>%
+  filter(Booster == "Bivalent") %>%
+  mutate(time = time + 60) %>%
+  select(time, pboost.coverage_of_vaccinated, sweepnum, Speed, country) %>%
+  mutate(country = case_when(
+    country == "Ecuador" ~ "Ecuador-like",
+    country == "India" ~ "India-like",
+    country == "Malaysia" ~ "Malaysia-like"))
+```
+
+
+#### Plot
+
+```{r}
+
+S18 <- dataS18 %>%
+  ggplot(aes(x=time, y=100*pboost.coverage_of_vaccinated, group=country))+
+  geom_line(aes(color=country,), size = 0.7)+ facet_rep_wrap(~Speed)+
+  geom_vline(xintercept = 900-840, color="red", linetype="solid", size=1.3) +
+  theme_minimal()+
+  scale_color_manual("Country", values = c("#05878a", "#5a175d", "#dd9933")) + 
+  scale_y_continuous("Boosted (% of vaccinated)", limits = c(0,100)) +
+  scale_x_continuous("Days since boosting started", limits = c(0,260)) +  
+  ggtitle("Hybrid immunity model", "Boosting 60 days before Omicron*") +
+  theme(axis.text = element_text(size = 11, color = "black"), #  angle = 90
+        axis.title.x = element_text(size = 12, color = "black",vjust = -1),
+        axis.title.y = element_text(size = 12, color = "black",vjust = +3),
+        axis.line = element_line(color = "black"),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        plot.margin = unit(c(t=0.2, r=0.5, b=0.5, l=0.5), "cm"),
+        legend.position = "right", plot.title.position = "plot",
+        strip.text = element_text(colour = "black", size = 11, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        legend.key.height= unit(0.4, 'cm'),
+        legend.key.width= unit(0.4, 'cm'),
+        legend.title = element_text(size = 11, color = "black"),
+        legend.text = element_text(size = 10, color = "black"),
+        panel.spacing = unit(0.5, "cm") , aspect.ratio=1)
+S18
+```
+
+
+#### save
+```{r}
+ggsave("../Supplement_June2024/FigS18.pdf", S18, width = 7, height = 4)
+
+```
+
+
+### S19: ODE histories 899
+
+#### Data
+
+```{r}
+datHistBar_2 <-read_csv("../Data/ABM Main Runs/dataHistories899.csv") %>% 
+  mutate(history_counts = round(history_counts, 1)) %>%
+  mutate(history_types= recode(history_types,
+                               WT_vaccine = "WT + vaccine",
+                               Delta_vaccine = "Delta + vaccine",
+                               Omicron_vaccine = "Omicron + vaccine",
+                               two = "Two events, other",
+                               three = "Three events, other",
+                               four = "Four or more immune events")) %>%
+  mutate(history_types = fct_relevel(history_types,
+    c("Naive", "Vaccine","Vaccine + booster","WT", 
+      "WT + vaccine", "WT + vaccine + booster",
+      "Delta", "Delta + vaccine", "Delta + vaccine + booster",
+      "Omicron", "Omicron + vaccine", "Omicron + vaccine + booster",
+      "Omicron*", "Omicron* + vaccine", "Omicron* + vaccine + booster",
+      "Two events, other", "Three events, other", 
+      "Four or more immune events")))
+```
+
+#### Plot
+
+```{r}
+
+colors <- c("#4B859F", "#0D3660","#6E8740", "#005B40", "#EE8768", 
+            "#BD451D", "#E18A8D", "#7C2529",
+            "#DFB81F", "#BC8400", "#6e500c")
+
+S19 <- datHistBar_2 %>%
+  mutate(country = case_when(
+    country == "Ecuador" ~ "Ecuador-like",
+    country == "India" ~ "India-like",
+    country == "Malaysia" ~ "Malaysia-like"
+  )) %>%
+  pivot_wider(names_from = name, values_from = history_counts) %>%
+  filter(history_types != "Vaccine_boost", 
+         history_types != "WT_vaccine_boost",
+         history_types != "Delta_vaccine_boost",
+         history_types != "Omicron_vaccine_boost") %>%
+  #pivot_wider(names_from = name, values_from = history_counts) %>%
+  ggplot(aes(x = country, fill = history_types, color= history_types)) +
+  geom_bar(aes(y=Mean), stat="identity", position=position_dodge(0.7),  
+           alpha=0.5, size = 0.6, width = 0.6) + theme_classic() +
+  geom_errorbar(aes(ymin  = Lower, ymax  = Upper),
+           stat="identity", position=position_dodge(0.7),  
+           size = 0.6, width = 0.3, show.legend=FALSE) + 
+  scale_y_continuous("History prevalence (%)", 
+                     limits = c(0, 45), expand = c(0,0)) +
+  scale_x_discrete("Country", expand = c(0.12,0.12)) + 
+  #facet_wrap(~country, scales = "free") + 
+  scale_fill_manual("Immune history", values = colors) + 
+  scale_color_manual("Immune history", values = colors) +
+  guides(color = guide_legend(nrow = 3), fill = guide_legend(nrow = 2)) +
+  theme_minimal() + 
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title.y = element_text(size = 12, color = "black"),
+        axis.title.x = element_text(size = 12, color = "black", vjust = -0.75),
+        axis.line = element_line(color = "black"),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.title.position = "plot",
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        plot.margin = unit(c(0.1, 0.1, 0.1, 0.1), "cm"),
+        legend.position = "bottom",
+        legend.key.size = unit(0.5, 'cm'), 
+        legend.text = element_text(size = 9, color = "black"),
+        legend.margin=margin(1,0.5,0.5,0.5,unit = "line"),
+        strip.text = element_text(colour = "black", size = 10.5, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        panel.spacing = unit(0.5, "cm"), aspect.ratio=0.2)
+S19
+```
+
+
+#### Save
+
+```{r}
+ggsave("../Supplement_June2024/FigS19.pdf", S19, width = 10, height = 4)
+#rm(datHistBar_2, data_key_times)
+```
+
+
+### S20: deaths per 10k bars
+
+#### Data 
+
+```{r}
+fast <- read_csv("../Data/ODE Supplement/fast_total.csv")
+
+#colors <- c("#0D3660","#BD451D","#428740")
+mycolors <- rev(c("#0D3660","#BD451D","#428740"))
+
+##noboost
+death_noboost <- fast %>% 
+   mutate(country = case_when(
+    country == "Ecuador" ~ "Ecuador-like",
+    country == "India" ~ "India-like",
+    country == "Malaysia" ~ "Malaysia-like")) %>%
+  filter(Booster == "Bivalent") %>% ## just grab one set of runs
+  mutate(relativeFOI = case_when(
+    relax == 0 ~ "100% infectiousness",
+    relax == 0.1 ~ "110% infectiousness",
+    relax == 0.3 ~ "130% infectiousness"
+  )) %>%
+  filter(relativeFOI != "100% infectiousness") %>%
+  #mutate(deaths10k) %>%
+    mutate(boost.speed = case_when(
+    boost.speed == "fast" ~ "Main text boosting",
+    boost.speed == "slow" ~ "Conservative boosting"
+  )) %>%
+  mutate(deaths_10k = DeathsComp_per100k/10) %>%
+  mutate(Booster = "No booster") %>% 
+  select(relativeFOI, boost.speed, Booster, deaths_10k, country)
+```
+
+
+#### Plot
+
+```{r}
+S20 <- fast %>%
+  mutate(country = case_when(
+    country == "Ecuador" ~ "Ecuador-like",
+    country == "India" ~ "India-like",
+    country == "Malaysia" ~ "Malaysia-like")) %>%
+  mutate(relativeFOI = case_when(
+    relax == 0 ~ "100% infectiousness",
+    relax == 0.1 ~ "110% infectiousness",
+    relax == 0.3 ~ "130% infectiousness")) %>%
+  filter(relativeFOI != "100% infectiousness") %>%
+  mutate(deaths_10k = deaths_100k/10) %>%
+    mutate(boost.speed = case_when(
+    boost.speed == "fast" ~ "Main text boosting",
+    boost.speed == "slow" ~ "Conservative boosting")) %>%
+  select(relativeFOI, boost.speed, Booster, deaths_10k, country) %>%
+  rbind(death_noboost) %>%
+  ggplot(aes(x=relativeFOI, y=deaths_10k, fill=Booster))+
+  geom_bar(stat='identity',alpha=0.8, size = 0.6, width = 0.6,
+           position=position_dodge(0.6))+
+  labs(x='Force of infection relative to Omicron', y='Deaths per 10k')+
+  theme_minimal()+ ggtitle("Hybrid immunity model", "Deaths per 10k") +
+  facet_rep_grid(boost.speed~country)+
+  scale_color_manual("Booster", values = mycolors) +
+  scale_fill_manual("Booster",values = mycolors) + 
+  theme(axis.text = element_text(size = 10, color = "black"), #  angle = 90
+        axis.title.x = element_text(size = 12, color = "black",vjust = -1),
+        axis.title.y = element_text(size = 12, color = "black",vjust = +3),
+        axis.line = element_line(color = "black"),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        plot.margin = unit(c(t=0.5, r=0.5, b=0.5, l=0.5), "cm"),
+        legend.position = "bottom", plot.title.position = "plot",
+        strip.text = element_text(colour = "black", size = 12, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        legend.key.height= unit(0.4, 'cm'),
+        legend.key.width= unit(0.4, 'cm'),
+        legend.title = element_text(size = 12, color = "black"),
+        legend.text = element_text(size = 11, color = "black"),
+        legend.margin=margin(t=1,r=0.5,b=0.2,l=0.5,unit = "line"),
+        panel.spacing = unit(0.5, "cm")) #, aspect.ratio=0.8)
+S20
+```
+
+#### Save
+
+```{r}
+ggsave("../Supplement_June2024/FigS20.pdf", S20, width = 10.5, height = 6)
+
+```
+
+
+### S22: deaths averted per 10k
+
+#### Data
+```{r}
+#colors <- c("#0D3660","#BD451D","#428740")
+mycolors <- rev(c("#BD451D","#428740"))
+
+## what is the duplicated value??
+
+dataS22 <- fast %>%
+  mutate(relativeFOI = case_when(
+    relax == 0 ~ "100% infectiousness",
+    relax == 0.1 ~ "110% infectiousness",
+    relax == 0.3 ~ "130% infectiousness")) %>%
+  filter(relativeFOI != "100% infectiousness") %>%
+  mutate(deathsaverted_10k = deathsaverted_per100k/10) %>%
+    mutate(boost.speed = case_when(
+    boost.speed == "fast" ~ "Main text boosting",
+    boost.speed == "slow" ~ "Conservative boosting")) %>%
+  mutate(country = case_when(
+    country == "Ecuador" ~ "Ecuador-like",
+    country == "India" ~ "India-like",
+    country == "Malaysia" ~ "Malaysia-like")) 
+```  
+
+
+#### Plot
+
+```{r}
+S22 <- dataS22 %>%
+  ggplot(aes(x=relativeFOI, y=deathsaverted_10k, fill=Booster)) +
+  geom_bar(stat='identity',alpha=0.8, size = 0.6, width = 0.6,
+           position=position_dodge(0.6)) + theme_minimal() + 
+  labs(x='Force of infection relative to Omicron', y='Deaths averted per 10k')+
+  ggtitle("Hybrid immunity model", "Deaths averted per 10k") +
+  facet_rep_grid(boost.speed~country)+
+  scale_color_manual("Booster", values = mycolors) +
+  scale_fill_manual("Booster",values = mycolors) + 
+  theme(axis.text = element_text(size = 10, color = "black"), #  angle = 90
+        axis.title.x = element_text(size = 12, color = "black",vjust = -1),
+        axis.title.y = element_text(size = 12, color = "black",vjust = +3),
+        axis.line = element_line(color = "black"),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        plot.margin = unit(c(t=0.5, r=0.5, b=0.5, l=0.5), "cm"),
+        legend.position = "bottom", plot.title.position = "plot",
+        strip.text = element_text(colour = "black", size = 12, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        legend.key.height= unit(0.4, 'cm'),
+        legend.key.width= unit(0.4, 'cm'),
+        legend.title = element_text(size = 12, color = "black"),
+        legend.text = element_text(size = 11, color = "black"),
+        legend.margin=margin(t=1,r=0.5,b=0.2,l=0.5,unit = "line"),
+        panel.spacing = unit(0.5, "cm")) #, aspect.ratio=0.8)
+S22
+```
+
+#### Save
+```{r}
+ggsave("../Supplement_June2024/FigS22.pdf", S22, width = 10.5, height = 6)
+```
+
+### S23: cases, 60 days prior boosting
+
+#### Data
+```{r}
+model_out_dat_total <- read_csv("../Data/ODE Supplement/model_out_data_total.csv")
+start_sims <- as.Date("2020-03-15", "%Y-%m-%d") 
+
+noboost_fast <- model_out_dat_total %>% 
+  mutate(relativeFOI = case_when(
+    relax == 0 ~ "100% infectiousness",
+    relax == 0.1 ~ "110%",
+    relax == 0.3 ~ "130%"
+  )) %>%
+  filter(relativeFOI != "100% infectiousness") %>%
+  filter(Booster == "None") %>%
+  mutate(boost.speed = case_when(
+    boost.speed == "fast" ~ "Main text boosting",
+    boost.speed == "slow" ~ "Conservative boosting"
+  )) %>%
+  mutate(I_10k = I_100k/10) %>% 
+  mutate(boost.speed = "Main text boosting")
+
+noboost_slow <- model_out_dat_total %>% 
+  mutate(relativeFOI = case_when(
+    relax == 0 ~ "100% infectiousness",
+    relax == 0.1 ~ "110%",
+    relax == 0.3 ~ "130%"
+  )) %>%
+  filter(relativeFOI != "100% infectiousness") %>%
+  filter(Booster == "None") %>%
+  mutate(boost.speed = case_when(
+    boost.speed == "fast" ~ "Main text boosting",
+    boost.speed == "slow" ~ "Conservative boosting"
+  )) %>%
+  mutate(I_10k = I_100k/10) %>% 
+  mutate(boost.speed = "Conservative boosting")
+
+data23 <- model_out_dat_total %>% 
+  mutate(relativeFOI = case_when(
+    relax == 0 ~ "100% infectiousness",
+    relax == 0.1 ~ "110%",
+    relax == 0.3 ~ "130%"
+  )) %>%
+  filter(relativeFOI != "100% infectiousness") %>%
+  filter(boost.start == "60") %>%
+  mutate(boost.speed = case_when(
+    boost.speed == "fast" ~ "Main text boosting",
+    boost.speed == "slow" ~ "Conservative boosting"
+  )) %>%
+  mutate(I_10k = I_100k/10) %>%
+  rbind(noboost_slow) %>%
+  rbind(noboost_fast) %>%
+  mutate(time = start_sims + time + 900) %>%
+  mutate(country = case_when(
+    country == "Ecuador" ~ "Ecuador-like",
+    country == "India" ~ "India-like",
+    country == "Malaysia" ~ "Malaysia-like"))
+
+```
+
+#### Plot 
+
+```{r}
+mycolors <- rev(c("#0D3660","#BD451D","#428740"))
+
+S23 <- data23 %>%  
+  ggplot(aes(x=time, y=I_10k, group=sweepnum))+
+  geom_line(aes(color=Booster, linetype=relativeFOI), size = 0.7)+
+  facet_rep_grid(boost.speed~country) + theme_classic() + 
+  scale_color_manual(values = mycolors) +
+  scale_linetype_manual("Infectiousness relative\nto Omicron",
+                        values = c("solid", "dashed")) +
+  labs(y='Infections per 10k') + 
+  scale_x_date("Date", expand = c(0,0), date_breaks = "1 month", 
+               date_labels =  "%b %Y") + 
+  ggtitle("Hybrid immunity model", "Boost 60 days prior to Omicron*") +
+  theme(axis.text = element_text(size = 11, color = "black"), #  angle = 90
+        #axis.title.x = element_text(size = 12, color = "black",vjust = -1),
+        axis.text.x=element_text(angle=60, hjust=1),
+        axis.title.y = element_text(size = 12, color = "black",vjust = +3),
+        axis.line = element_line(color = "black"),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        plot.margin = unit(c(t=0.3, r=0.3, b=0.3, l=0.3), "cm"),
+        legend.position = "right", plot.title.position = "plot",
+        strip.text = element_text(colour = "black", size = 11, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        legend.key.height= unit(0.4, 'cm'),
+        legend.key.width= unit(0.4, 'cm'),
+        legend.title = element_text(size = 11, color = "black"),
+        legend.text = element_text(size = 10, color = "black"),
+        panel.spacing = unit(0.5, "cm") , aspect.ratio=0.5)
+S23
+```
+
+
+#### Save
+
+```{r}
+ggsave("../Supplement_June2024/FigS23.pdf", width = 13.2, height = 5.5)
+```
+
+### S24: boosting, 0 days prior
+
+#### Data
+
+```{r}
+model_out_dat_total <- read_csv("../Data/ODE Supplement/model_out_data_total.csv")
+start_sims <- as.Date("2020-03-15", "%Y-%m-%d") 
+
+dataS24 <- model_out_dat_total %>%
+  mutate(relativeFOI = case_when(
+    relax == 0 ~ "100% infectiousness",
+    relax == 0.1 ~ "110% infectiousness",
+    relax == 0.3 ~ "130% infectiousness"
+  )) %>%
+  filter(relativeFOI == "130% infectiousness") %>%
+  filter(boost.start == "0") %>%
+  mutate(Speed = case_when(
+    boost.speed == "fast" ~ "Main text boosting",
+    boost.speed == "slow" ~ "Conservative boosting")) %>%
+  filter(Booster == "Bivalent") %>%
+  mutate(country = case_when(
+    country == "Ecuador" ~ "Ecuador-like",
+    country == "India" ~ "India-like",
+    country == "Malaysia" ~ "Malaysia-like")) %>%
+  select(time, pboost.coverage_of_vaccinated, sweepnum, Speed, country) 
+```
+
+#### Plot 
+
+```{r}
+S24 <- dataS24 %>% 
+  ggplot(aes(x=time, y=100*pboost.coverage_of_vaccinated, group=country)) +
+  geom_line(aes(color=country,), size = 0.7)+
+  facet_rep_wrap(~Speed)+theme_minimal()+
+  geom_vline(xintercept = 0, color="red", linetype="solid", size=1.3) +
+  scale_color_manual("Country", values = c("#05878a", "#5a175d", "#dd9933")) + 
+  scale_y_continuous("Boosted (% of vaccinated)", limits = c(0,100)) +
+  scale_x_continuous("Days since boosting started", limits = c(0,210)) +
+  ggtitle("Hybrid immunity model", "Boosting 0 days before Omicron*")+
+  theme(axis.text = element_text(size = 11, color = "black"), #  angle = 90
+        axis.title.x = element_text(size = 12, color = "black",vjust = -1),
+        axis.title.y = element_text(size = 12, color = "black",vjust = +3),
+        axis.line = element_line(color = "black"),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        plot.margin = unit(c(t=0.2, r=0.5, b=0.5, l=0.5), "cm"),
+        legend.position = "right", plot.title.position = "plot",
+        strip.text = element_text(colour = "black", size = 11, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        legend.key.height= unit(0.4, 'cm'),
+        legend.key.width= unit(0.4, 'cm'),
+        legend.title = element_text(size = 11, color = "black"),
+        legend.text = element_text(size = 10, color = "black"),
+        panel.spacing = unit(0.5, "cm") , aspect.ratio=1)
+S24
+```
+
+#### Save
+
+```{r}
+ggsave("../Supplement_June2024/FigS24.pdf", width = 7, height = 4)
+```
+
+### S25: cases, 0 days prior boosting
+
+#### Data
+
+```{r}
+dataS25 <- model_out_dat_total %>% 
+  mutate(relativeFOI = case_when(
+    relax == 0 ~ "100% infectiousness",
+    relax == 0.1 ~ "110%",
+    relax == 0.3 ~ "130%")) %>%
+  filter(relativeFOI != "100% infectiousness") %>%
+  filter(boost.start == "0") %>%
+  mutate(boost.speed = case_when(
+    boost.speed == "fast" ~ "Main text boosting",
+    boost.speed == "slow" ~ "Conservative boosting")) %>%
+  mutate(I_10k = I_100k/10) %>%
+  rbind(noboost_slow) %>%
+  rbind(noboost_fast) %>%
+  mutate(time = start_sims + time + 900) %>%
+  mutate(country = case_when(
+    country == "Ecuador" ~ "Ecuador-like",
+    country == "India" ~ "India-like",
+    country == "Malaysia" ~ "Malaysia-like")) 
+```
+
+```{r}
+mycolors <- rev(c("#0D3660","#BD451D","#428740"))
+
+S25 <- dataS25 %>%
+  ggplot(aes(x=time, y=I_10k, group=sweepnum))+
+  geom_line(aes(color=Booster, linetype=relativeFOI), size = 0.7)+
+  facet_rep_grid(boost.speed~country, scales = "free") + theme_classic() + 
+  scale_color_manual(values = mycolors) +
+  scale_linetype_manual("Infectiousness relative\nto Omicron",
+                        values = c("solid", "dashed")) +
+  labs(y='Infections per 10k') + 
+  scale_x_date("Date", expand = c(0,0), date_breaks = "1 month", 
+               date_labels =  "%b %Y") + 
+  ggtitle("Hybrid immunity model", "Boost 0 days prior to Omicron*") +
+  theme(axis.text = element_text(size = 11, color = "black"), #  angle = 90
+        #axis.title.x = element_text(size = 12, color = "black",vjust = -1),
+        axis.text.x=element_text(angle=60, hjust=1),
+        axis.title.y = element_text(size = 12, color = "black",vjust = +3),
+        axis.line = element_line(color = "black"),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        plot.margin = unit(c(t=0.3, r=0.3, b=0.3, l=0.3), "cm"),
+        legend.position = "right", plot.title.position = "plot",
+        strip.text = element_text(colour = "black", size = 11, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        legend.key.height= unit(0.4, 'cm'),
+        legend.key.width= unit(0.4, 'cm'),
+        legend.title = element_text(size = 11, color = "black"),
+        legend.text = element_text(size = 10, color = "black"),
+        panel.spacing = unit(0.5, "cm") , aspect.ratio=0.5)
+S25
+```
+
+```{r}
+ggsave("../Supplement_June2024/FigS25.pdf", S25, width = 13.2, height = 5.5)
+```
+
+### S26: booster start time
+
+#### Data
+
+```{r}
+df_AvertedODE <- read_csv("../Data/ODE Supplement/df_AvertedODE_total.csv")
+
+dataS26 <- df_AvertedODE %>%
+  mutate(relativeFOI = case_when(
+    relax == 0 ~ "100% infectiousness",
+    relax == 0.1 ~ "110% infectiousness",
+    relax == 0.3 ~ "130% infectiousness")) %>%
+  mutate(boost.speed = case_when(
+    boost.speed == "fast" ~ "Main text\n boosting",
+    boost.speed == "slow" ~ "Conservative\n boosting")) %>%
+  filter(relativeFOI != "100% infectiousness") %>%
+  mutate(deathsaverted_per100k = DeathsComp_per100k-deaths_100k) %>%
+  mutate(deathsaverted_per10k = deathsaverted_per100k/10) %>%
+  mutate(country = case_when(
+    country == "Ecuador" ~ "Ecuador-like",
+    country == "India" ~ "India-like",
+    country == "Malaysia" ~ "Malaysia-like")) %>%
+  mutate(boost.start.time = recode(boost.start.time, 
+    "Start boosting  0  days prior to omicron*" = 
+      "0 days prior to omicron*" , 
+    "Start boosting  60  days prior to omicron*" = 
+      "60 days prior to omicron*"))
+```
+
+#### Plot 
+
+```{r}
+mycolors <- rev(c("#BD451D","#428740"))
+
+S26 <- dataS26 %>%
+  ggplot(aes(x=boost.speed, y=deathsaverted_per10k, fill=Booster))+
+  geom_point(aes(color=Booster, shape = boost.start.time), size = 2)+
+  facet_rep_grid(relativeFOI~country)+
+  labs(x='Boosting speed', y='Deaths averted per 10k')+
+  scale_color_manual(values = mycolors) +
+  scale_shape_manual("Booster start time", values =c(16,17)) +
+  theme_minimal() +
+  ggtitle("Hybrid immunity model", "Booster timing") +
+  theme(axis.text = element_text(size = 11, color = "black"), #  angle = 90
+        axis.title.x = element_text(size = 12, color = "black",vjust = -1),
+        axis.title.y = element_text(size = 12, color = "black",vjust = +3),
+        axis.line = element_line(color = "black"),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        plot.margin = unit(c(t=0.3, r=0.3, b=0.3, l=0.3), "cm"),
+        legend.position = "right", plot.title.position = "plot",
+        strip.text = element_text(colour = "black", size = 11, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        #legend.key.size = unit(2.5, 'lines'),
+        legend.title = element_text(size = 11, color = "black"),
+        legend.text = element_text(size = 10, color = "black"),
+        panel.spacing = unit(0.5, "cm"))
+S26
+```
+
+#### Save
+```{r}
+ggsave("../Supplement_June2024/FigS26.pdf", S26, width = 10, height = 5)
+```
+
+### S32: Deaths per 10,000 − History specific model
+
+#### Data
+
+```{r}
+pop_ABM <- read_csv("../Data/ABM_Parameters_Data/Grid_Param.csv") %>% select(Name, child, adult, old) %>% 
+  summarise(Name,start_pop = 2*(child + adult+ old)) %>% 
+  distinct() %>% 
+  arrange(Name) %>% 
+  rename(country = Name)
+
+## change time to date
+start_sims <- as.Date("2020-03-15", "%Y-%m-%d") 
+
+dataAll <- read_csv("../Data/ABM Main Runs/dataAll.csv")%>% 
+  left_join(pop_ABM) %>%
+  group_by(ID_runs, time) %>% 
+  filter(cum_sum_Inf == max(cum_sum_Inf)) %>%
+  ungroup() %>%
+  mutate(time = start_sims + time) ## take out this line to get back to days 
+
+dataS32 <- dataAll %>% 
+  mutate(country = case_when(
+    country == "Ecuador" ~ "Ecuador-like",
+    country == "India" ~ "India-like",
+    country == "Malaysia" ~ "Malaysia-like")) %>%
+  filter(vaccine_star == "no") %>% 
+  filter(time >= start_sims + 900) %>% 
+  group_by(SAR, booster, country, replicate, scenario) %>% 
+  mutate(deaths10K = 10000*deaths_over_time/start_pop) %>%
+  summarise(death_compare_10K = max(deaths10K)-min(deaths10K)) %>%
+  ungroup() %>% mutate(booster = case_when(
+    scenario == "penalty" ~ "Bivalent",
+    scenario == "Ompenalty" ~ "Monovalent (Omicron)",
+    scenario == "WTpenalty" ~ "Monovalent (WT)",
+    scenario == "no booster" ~ "No booster")) %>% 
+  mutate(Booster = fct_relevel(booster, "Monovalent")) %>% 
+  mutate(SAR = recode(SAR,`0.427` = "100%",
+    `0.4697` = "110%", `0.5551` = "130%")) %>%
+  mutate(SAR = fct_relevel(SAR, c("100%", "110%", "130%"))) %>% 
+  filter(SAR != "100%") %>% group_by(SAR,country,Booster,) %>%
+  summarise(x  = smean.cl.normal(death_compare_10K), 
+            name = c("Mean","Lower","Upper")) %>% ungroup() %>%
+  pivot_wider(names_from = name, values_from = x) %>%
+  mutate(Booster = fct_relevel(Booster, 
+       c("No booster", "Monovalent (WT)",
+         "Monovalent (Omicron)", "Bivalent")))
+```
+
+```{r}
+colors <- c("#0D3660","#BC8400","#7C2529", "#005B40")
+
+S32 <- dataS32 %>% 
+  ggplot(aes(x = SAR, fill = Booster, color = Booster,
+                     group = interaction(Booster, SAR))) + 
+  geom_bar(aes(y=Mean), stat="identity", position=position_dodge(0.7),  
+           alpha=0.5, size = 0.6, width = 0.6) + theme_classic() +
+  geom_errorbar(aes(ymin  = Lower, ymax  = Upper),
+           stat="identity", position=position_dodge(0.7),  
+           size = 0.6, width = 0.3, show.legend=FALSE) + 
+  scale_fill_manual("Booster", values = colors) +
+  scale_color_manual("Booster", values = colors) +
+  facet_wrap(~country, scales = "free", nrow = 1) +
+  scale_y_continuous("Deaths per 10,000", limits = c(0,9.2), 
+                     expand = expansion(mult = c(0,0)), 
+                     breaks = c(0,2,4,6,8)) +
+  scale_x_discrete("Infectiousness relative to Omicron") +
+  ggtitle("Deaths per 10,000 - History specific model") + 
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title.x = element_text(size = 12, color = "black",vjust = -1),
+        axis.title.y = element_text(size = 12, color = "black",vjust = +3),
+        axis.line = element_line(color = "black"),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        plot.title.position = "plot",
+        plot.margin = unit(c(t=0.3, r=0.3, b=0.3, l=0.3), "cm"),
+        strip.text = element_text(colour = "black", size = 12, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        panel.spacing = unit(0.5, "cm")) #, aspect.ratio=0.7)
+S32
+```
+
+```{r}
+ggsave("../Supplement_June2024/FigS32.pdf", S32, height = 4, width = 12)
+```
+
+
+
+### S33: HIM Deaths per 10,000 − Recalibrated
+
+#### Data
+
+```{r}
+Ec_ts20 <- read_csv("../Data/ODE Supplement/Ecuador_ts_altbeta.csv") %>%
+  mutate(country = "Ecuador") %>%
+  rename(sd = sd0)
+Ma_ts20 <- read_csv("../Data/ODE Supplement/Malaysia_ts_altbeta.csv") %>% 
+  mutate(country = "Malaysia")
+In_ts20 <- read_csv("../Data/ODE Supplement/India_ts_altbeta.csv") %>% 
+  mutate(country = "India")
+
+ODE_ts20 <- rbind(Ec_ts20, Ma_ts20) %>% rbind(In_ts20)
+
+Ec_da20 <- read_csv("../Data/ODE Supplement/Ecuador_run_da_altbeta.csv")%>%
+  mutate(country = "Ecuador")
+Ma_da20 <- read_csv("../Data/ODE Supplement/Malaysia_run_da_altbeta.csv")%>% 
+  mutate(country = "Malaysia")
+In_da20 <- read_csv("../Data/ODE Supplement/India_run_da_altbeta.csv")%>% 
+  mutate(country = "India")
+
+ODE_da20 <- rbind(Ec_da20, Ma_da20) %>% rbind(In_da20)
+
+Ec_grid20 <- read_csv("../Data/ODE Supplement/Ecuador_grid_da_altbeta.csv")
+Ma_grid20 <- read_csv("../Data/ODE Supplement/Malaysia_grid_da_altbeta.csv")
+In_grid20 <- read_csv("../Data/ODE Supplement/India_grid_da_altbeta.csv")
+```
+
+
+#### Plot S33A
+
+```{r}
+mycolors <- rev(pnw_palette("Moth", n = 11))
+
+dataPlaces <- ODE_ts20 %>% 
+  select(cp, base.imm, country) %>% 
+  mutate(cp = as.numeric(cp), base.imm = as.numeric(base.imm)) %>%
+  distinct() %>% 
+  filter(country == "Ecuador")
+
+Ec_grid_noboost20 <- Ec_grid20 %>% 
+  filter(Booster == "Bivalent") %>% ## just grab one set of runs
+  mutate(base.imm = as.numeric(base.imm), cp= as.numeric(cp))%>%
+  mutate(relax = case_when(relax == 0.1 ~ "110% Infectiousness",
+                           relax == 0.3 ~ "130% Infectiousness")) %>%
+  mutate(deaths_10k = deaths_100k_comp/10) %>%
+  mutate(Booster = "No booster") %>% 
+  select(base.imm, cp, relax, deaths_10k, Booster)
+
+S33A <- Ec_grid20  %>% 
+  mutate(base.imm = as.numeric(base.imm), cp= as.numeric(cp))%>%
+  mutate(relax = case_when(relax == 0.1 ~ "110% Infectiousness",
+                           relax == 0.3 ~ "130% Infectiousness")) %>%
+  mutate(deaths_10k = deaths_100k/10)  %>% 
+  select(base.imm, cp, relax, deaths_10k, Booster) %>%
+  rbind(Ec_grid_noboost20) %>% filter(base.imm <= 0.9) %>%
+  ggplot(aes(x = base.imm, y = cp)) + theme_classic() +
+  geom_tile(aes(fill = deaths_10k)) + facet_grid(Booster~relax) + 
+  geom_point(data = dataPlaces, color= "black", fill = "black", size = 2) +
+  scale_fill_stepsn("Deaths per 10,000",colors=mycolors,
+                    breaks = seq(0,12,1), limits=c(0,12),
+                    labels =c(0,"", 2, "", 4, "", 6, "", 8, "", 10,"",12)) +
+  guides(fill = guide_colourbar(title.position="top", title.hjust = 0.5)) + 
+  scale_y_continuous("Cross protection",labels = 
+          scales::percent_format(accuracy = 1), 
+          breaks = c(0,0.3,0.6,0.9), expand = c(0,0)) +
+  scale_x_continuous("Prior infection",labels = 
+          scales::percent_format(accuracy = 1), 
+          breaks = c(0,0.3,0.6,0.9), expand = c(0,0)) +
+  ggtitle("Deaths per 10,000 - Recalibrated","         Ecuador-like") +
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        plot.margin = unit(c(t=0.2, r=0.2, b=0.2, l=0.2), "cm"),
+        legend.key.width= unit(1.2, 'cm'),
+        legend.position = "none", 
+        plot.title.position = "plot",
+        legend.title = element_text(size = 11, color = "black"),
+        legend.text = element_text(size = 9, color = "black"),
+        strip.text.x = element_text(colour = "black", size = 11, hjust = 0),
+        strip.text.y = element_text(colour = "black", size = 10, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.3, "cm"), aspect.ratio=1)
+S33A
+```
+
+#### Plot S33B
+
+```{r}
+
+dataPlaces <- ODE_ts20 %>% 
+  select(cp, base.imm, country) %>% 
+  mutate(cp = as.numeric(cp), base.imm = as.numeric(base.imm)) %>%
+  distinct() %>% 
+  filter(country == "India")
+
+In_grid_noboost20 <- In_grid20 %>% 
+  filter(Booster == "Bivalent") %>% ## just grab one set of runs
+  mutate(base.imm = as.numeric(base.imm), cp= as.numeric(cp))%>%
+  mutate(relax = case_when(relax == 0.1 ~ "110% Infectiousness",
+                           relax == 0.3 ~ "130% Infectiousness")) %>%
+  mutate(deaths_10k = deaths_100k_comp/10) %>%
+  mutate(Booster = "No booster") %>% 
+  select(base.imm, cp, relax, deaths_10k, Booster)
+
+
+S33B <- In_grid20  %>% 
+  mutate(base.imm = as.numeric(base.imm), cp= as.numeric(cp))%>%
+  mutate(relax = case_when(relax == 0.1 ~ "110% Infectiousness",
+                           relax == 0.3 ~ "130% Infectiousness")) %>%
+  mutate(deaths_10k = deaths_100k/10)  %>% 
+  select(base.imm, cp, relax, deaths_10k, Booster) %>%
+  rbind(In_grid_noboost20) %>% filter(base.imm <= 0.9) %>%
+  ggplot(aes(x = base.imm, y = cp)) + theme_classic() +
+  geom_tile(aes(fill = deaths_10k)) + facet_grid(Booster~relax) + 
+  geom_point(data = dataPlaces, color= "black", fill = "black", size = 2) +
+  scale_fill_stepsn("Deaths per 10,000",colors=mycolors,
+                    breaks = seq(0,12,1), limits=c(0,12),
+                    labels =c(0,"", 2, "", 4, "", 6, "", 8, "", 10,"",12)) +
+  guides(fill = guide_colourbar(title.position="top", title.hjust = 0.5)) + 
+  scale_y_continuous("Cross protection",labels = 
+          scales::percent_format(accuracy = 1), 
+          breaks = c(0,0.3,0.6,0.9), expand = c(0,0)) +
+  scale_x_continuous("Prior infection",labels = 
+          scales::percent_format(accuracy = 1), 
+          breaks = c(0,0.3,0.6,0.9), expand = c(0,0)) +
+  ggtitle("","         India-like") +
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        plot.margin = unit(c(t=0.2, r=0.2, b=0.2, l=0.2), "cm"),
+        legend.key.width= unit(1.2, 'cm'),
+        legend.position = "none", 
+        plot.title.position = "plot",
+        legend.title = element_text(size = 11, color = "black"),
+        legend.text = element_text(size = 9, color = "black"),
+        strip.text.x = element_text(colour = "black", size = 11, hjust = 0),
+        strip.text.y = element_text(colour = "black", size = 10, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.3, "cm"), aspect.ratio=1)
+S33B
+```
+
+#### Plot S33C
+
+```{r}
+dataPlaces <- ODE_ts20 %>% 
+  select(cp, base.imm, country) %>% 
+  mutate(cp = as.numeric(cp), base.imm = as.numeric(base.imm)) %>%
+  distinct() %>% 
+  filter(country == "Malaysia")
+
+Ma_grid_noboost20 <- Ma_grid20 %>% 
+  filter(Booster == "Bivalent") %>% ## just grab one set of runs
+  mutate(base.imm = as.numeric(base.imm), cp= as.numeric(cp))%>%
+  mutate(relax = case_when(relax == 0.1 ~ "110% Infectiousness",
+                           relax == 0.3 ~ "130% Infectiousness")) %>%
+  mutate(deaths_10k = deaths_100k_comp/10) %>%
+  mutate(Booster = "No booster") %>% 
+  select(base.imm, cp, relax, deaths_10k, Booster)
+
+
+S33C <- Ma_grid20  %>% 
+  mutate(base.imm = as.numeric(base.imm), cp= as.numeric(cp))%>%
+  mutate(relax = case_when(relax == 0.1 ~ "110% Infectiousness",
+                           relax == 0.3 ~ "130% Infectiousness")) %>%
+  mutate(deaths_10k = deaths_100k/10)  %>% 
+  select(base.imm, cp, relax, deaths_10k, Booster) %>%
+  rbind(Ma_grid_noboost20) %>% filter(base.imm <= 0.9) %>%
+  ggplot(aes(x = base.imm, y = cp)) + theme_classic() +
+  geom_tile(aes(fill = deaths_10k)) + facet_grid(Booster~relax) +
+  geom_point(data = dataPlaces, color= "black", fill = "black", size = 2) +
+  scale_fill_stepsn("Deaths per 10,000",colors=mycolors,
+                    breaks = seq(0,12,1), limits=c(0,12),
+                    labels =c(0,"", 2, "", 4, "", 6, "", 8, "", 10,"",12)) +
+  guides(fill = guide_colourbar(title.position="top", title.hjust = 0.5)) + 
+  scale_y_continuous("Cross protection",labels = 
+          scales::percent_format(accuracy = 1), 
+          breaks = c(0,0.3,0.6,0.9), expand = c(0,0)) +
+  scale_x_continuous("Prior infection",labels = 
+          scales::percent_format(accuracy = 1), 
+          breaks = c(0,0.3,0.6,0.9), expand = c(0,0)) +
+  ggtitle("","         Malaysia-like") +
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        plot.margin = unit(c(t=0.2, r=0.2, b=0.2, l=0.2), "cm"),
+        legend.key.width= unit(0.5, 'cm'),
+        legend.position = "right", 
+        plot.title.position = "plot",
+        legend.title = element_text(size = 11, color = "black"),
+        legend.text = element_text(size = 9, color = "black"),
+        strip.text.x = element_text(colour = "black", size = 11, hjust = 0),
+        strip.text.y = element_text(colour = "black", size = 10, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.3, "cm"), aspect.ratio=1)
+S33C
+```
+
+#### Save
+```{r}
+S33 <- plot_grid(S33A,S33B,S33C, nrow = 1, rel_widths = c(1,1,1.4))
+ggsave("../Supplement_June2024/FigS33.pdf", S33, height = 6, width = 14)
+```
+
+
+### S34: HIM Deaths per 10,000 − adjust transmission
+
+#### Data
+
+```{r}
+## ODE data ##
+Ec_ts22 <- read_csv("../Data/ODE Supplement/Ecuador_ts_altbetaR0.csv") %>%
+  mutate(country = "Ecuador") %>%
+  rename(sd = sd0)
+Ma_ts22 <- read_csv("../Data/ODE Supplement/Malaysia_ts_altbetaR0.csv") %>% 
+  mutate(country = "Malaysia")
+In_ts22 <- read_csv("../Data/ODE Supplement/India_ts_altbetaR0.csv") %>% 
+  mutate(country = "India")
+
+ODE_ts22 <- rbind(Ec_ts22, Ma_ts22) %>% rbind(In_ts22)
+
+Ec_da22 <- read_csv("../Data/ODE Supplement/Ecuador_run_da_altbetaR0.csv")%>%
+  mutate(country = "Ecuador")
+Ma_da22 <- read_csv("../Data/ODE Supplement/Malaysia_run_da_altbetaR0.csv")%>% 
+  mutate(country = "Malaysia")
+In_da22 <- read_csv("../Data/ODE Supplement/India_run_da_altbetaR0.csv")%>% 
+  mutate(country = "India")
+
+ODE_da22 <- rbind(Ec_da22, Ma_da22) %>% rbind(In_da22)
+
+Ec_grid22 <- read_csv("../Data/ODE Supplement/Ecuador_grid_da_altbetaR0.csv")
+Ma_grid22 <- read_csv("../Data/ODE Supplement/Malaysia_grid_da_altbetaR0.csv")
+In_grid22 <- read_csv("../Data/ODE Supplement/India_grid_da_altbetaR0.csv")
+```
+
+
+#### Plot S34A
+
+```{r}
+mycolors <- rev(pnw_palette("Moth", n = 11))
+dataPlaces <- ODE_ts22 %>% 
+  select(cp, base.imm, country) %>% 
+  mutate(cp = as.numeric(cp), base.imm = as.numeric(base.imm)) %>%
+  distinct() %>% 
+  filter(country == "Ecuador")
+
+Ec_grid_noboost22 <- Ec_grid22 %>% 
+  filter(Booster == "Bivalent") %>% ## just grab one set of runs
+  mutate(base.imm = as.numeric(base.imm), cp= as.numeric(cp))%>%
+  mutate(relax = case_when(relax == 0.1 ~ "110% Infectiousness",
+                           relax == 0.3 ~ "130% Infectiousness")) %>%
+  mutate(deaths_10k = deaths_100k_comp/10) %>%
+  mutate(Booster = "No booster") %>% 
+  select(base.imm, cp, relax, deaths_10k, Booster)
+
+S34A <- Ec_grid22  %>% 
+  mutate(base.imm = as.numeric(base.imm), cp= as.numeric(cp))%>%
+  mutate(relax = case_when(relax == 0.1 ~ "110% Infectiousness",
+                           relax == 0.3 ~ "130% Infectiousness")) %>%
+  mutate(deaths_10k = deaths_100k/10)  %>% 
+  select(base.imm, cp, relax, deaths_10k, Booster) %>%
+  rbind(Ec_grid_noboost22) %>% filter(base.imm <= 0.9) %>%
+  ggplot(aes(x = base.imm, y = cp)) + theme_classic() +
+  geom_tile(aes(fill = deaths_10k)) + facet_grid(Booster~relax) + 
+  geom_point(data = dataPlaces, color= "black", fill = "black", size = 2) +
+  scale_fill_stepsn("Deaths per 10,000",colors=mycolors,
+                    breaks = seq(0,16,2), limits=c(0,16),
+                    labels =c(0, 2, 4,6,8,10,12,14,16)) +
+  guides(fill = guide_colourbar(title.position="top", title.hjust = 0.5)) + 
+  scale_y_continuous("Cross protection",labels = 
+          scales::percent_format(accuracy = 1), 
+          breaks = c(0,0.3,0.6,0.9), expand = c(0,0)) +
+  scale_x_continuous("Prior infection",labels = 
+          scales::percent_format(accuracy = 1), 
+          breaks = c(0,0.3,0.6,0.9), expand = c(0,0)) +
+  ggtitle("Deaths per 10,000 - adjust transmission","         Ecuador-like") +
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        plot.margin = unit(c(t=0.2, r=0.2, b=0.2, l=0.2), "cm"),
+        legend.key.width= unit(1.2, 'cm'),
+        legend.position = "none", 
+        plot.title.position = "plot",
+        legend.title = element_text(size = 11, color = "black"),
+        legend.text = element_text(size = 9, color = "black"),
+        strip.text.x = element_text(colour = "black", size = 11, hjust = 0),
+        strip.text.y = element_text(colour = "black", size = 10, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.3, "cm"), aspect.ratio=1)
+S34A
+```
+
+
+#### Plot S34B
+
+```{r}
+dataPlaces <- ODE_ts22 %>% 
+  select(cp, base.imm, country) %>% 
+  mutate(cp = as.numeric(cp), base.imm = as.numeric(base.imm)) %>%
+  distinct() %>% 
+  filter(country == "India")
+
+In_grid_noboost22 <- In_grid22 %>% 
+  filter(Booster == "Bivalent") %>% ## just grab one set of runs
+  mutate(base.imm = as.numeric(base.imm), cp= as.numeric(cp))%>%
+  mutate(relax = case_when(relax == 0.1 ~ "110% Infectiousness",
+                           relax == 0.3 ~ "130% Infectiousness")) %>%
+  mutate(deaths_10k = deaths_100k_comp/10) %>%
+  mutate(Booster = "No booster") %>% 
+  select(base.imm, cp, relax, deaths_10k, Booster)
+
+
+S34B <- In_grid22  %>% 
+  mutate(base.imm = as.numeric(base.imm), cp= as.numeric(cp))%>%
+  mutate(relax = case_when(relax == 0.1 ~ "110% Infectiousness",
+                           relax == 0.3 ~ "130% Infectiousness")) %>%
+  mutate(deaths_10k = deaths_100k/10)  %>% 
+  select(base.imm, cp, relax, deaths_10k, Booster) %>%
+  rbind(In_grid_noboost22) %>% filter(base.imm <= 0.9) %>%
+  ggplot(aes(x = base.imm, y = cp)) + theme_classic() +
+  geom_tile(aes(fill = deaths_10k)) + facet_grid(Booster~relax) + 
+  geom_point(data = dataPlaces, color= "black", fill = "black", size = 2) +
+  scale_fill_stepsn("Deaths per 10,000",colors=mycolors,
+                    breaks = seq(0,16,2), limits=c(0,16),
+                    labels =c(0, 2, 4,6,8,10,12,14,16)) +
+  guides(fill = guide_colourbar(title.position="top", title.hjust = 0.5)) + 
+  scale_y_continuous("Cross protection",labels = 
+          scales::percent_format(accuracy = 1), 
+          breaks = c(0,0.3,0.6,0.9), expand = c(0,0)) +
+  scale_x_continuous("Prior infection",labels = 
+          scales::percent_format(accuracy = 1), 
+          breaks = c(0,0.3,0.6,0.9), expand = c(0,0)) +
+  ggtitle("","         India-like") +
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        plot.margin = unit(c(t=0.2, r=0.2, b=0.2, l=0.2), "cm"),
+        legend.key.width= unit(1.2, 'cm'),
+        legend.position = "none", 
+        plot.title.position = "plot",
+        legend.title = element_text(size = 11, color = "black"),
+        legend.text = element_text(size = 9, color = "black"),
+        strip.text.x = element_text(colour = "black", size = 11, hjust = 0),
+        strip.text.y = element_text(colour = "black", size = 10, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.3, "cm"), aspect.ratio=1)
+S34B
+```
+
+
+#### Plot S34C
+
+```{r}
+dataPlaces <- ODE_ts22 %>% 
+  select(cp, base.imm, country) %>% 
+  mutate(cp = as.numeric(cp), base.imm = as.numeric(base.imm)) %>%
+  distinct() %>% 
+  filter(country == "Malaysia")
+
+Ma_grid_noboost22 <- Ma_grid22 %>% 
+  filter(Booster == "Bivalent") %>% ## just grab one set of runs
+  mutate(base.imm = as.numeric(base.imm), cp= as.numeric(cp))%>%
+  mutate(relax = case_when(relax == 0.1 ~ "110% Infectiousness",
+                           relax == 0.3 ~ "130% Infectiousness")) %>%
+  mutate(deaths_10k = deaths_100k_comp/10) %>%
+  mutate(Booster = "No booster") %>% 
+  select(base.imm, cp, relax, deaths_10k, Booster)
+
+
+S34C <- Ma_grid22  %>% 
+  mutate(base.imm = as.numeric(base.imm), cp= as.numeric(cp))%>%
+  mutate(relax = case_when(relax == 0.1 ~ "110% Infectiousness",
+                           relax == 0.3 ~ "130% Infectiousness")) %>%
+  mutate(deaths_10k = deaths_100k/10)  %>% 
+  select(base.imm, cp, relax, deaths_10k, Booster) %>%
+  rbind(Ma_grid_noboost22) %>% filter(base.imm <= 0.9) %>%
+  ggplot(aes(x = base.imm, y = cp)) + theme_classic() +
+  geom_tile(aes(fill = deaths_10k)) + facet_grid(Booster~relax) +
+  geom_point(data = dataPlaces, color= "black", fill = "black", size = 2) +
+  scale_fill_stepsn("Deaths per 10,000",colors=mycolors,
+                    breaks = seq(0,16,2), limits=c(0,16),
+                    labels =c(0, 2, 4,6,8,10,12,14,16)) +
+  guides(fill = guide_colourbar(title.position="top", title.hjust = 0.5)) + 
+  scale_y_continuous("Cross protection",labels = 
+          scales::percent_format(accuracy = 1), 
+          breaks = c(0,0.3,0.6,0.9), expand = c(0,0)) +
+  scale_x_continuous("Prior infection",labels = 
+          scales::percent_format(accuracy = 1), 
+          breaks = c(0,0.3,0.6,0.9), expand = c(0,0)) +
+  ggtitle("","         Malaysia-like") +
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        plot.margin = unit(c(t=0.2, r=0.2, b=0.2, l=0.2), "cm"),
+        legend.key.width= unit(0.5, 'cm'),
+        legend.position = "right", 
+        plot.title.position = "plot",
+        legend.title = element_text(size = 11, color = "black"),
+        legend.text = element_text(size = 9, color = "black"),
+        strip.text.x = element_text(colour = "black", size = 11, hjust = 0),
+        strip.text.y = element_text(colour = "black", size = 10, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.3, "cm"), aspect.ratio=1)
+S34C
+```
+
+#### Save
+```{r}
+S34 <- plot_grid(S34A,S34B,S34C, nrow = 1, rel_widths = c(1,1,1.4))
+ggsave("../Supplement_June2024/FigS34.pdf", S34, height = 6, width = 14)
+```
+
+
+### S36: HIM Deaths per 10,000 − 75% waned
+
+#### Data
+```{r}
+## ODE data ##
+Ec_tswane <- read_csv("../Data/ODE Supplement/Ecuador_ts base.wane.csv") %>%
+  mutate(country = "Ecuador") %>%
+  rename(sd = sd0)
+Ma_tswane <- read_csv("../Data/ODE Supplement/Malaysia_ts base.wane.csv") %>% 
+  mutate(country = "Malaysia")
+In_tswane <- read_csv("../Data/ODE Supplement/India_ts base.wane.csv") %>% 
+  mutate(country = "India")
+
+ODE_tswane <- rbind(Ec_tswane, Ma_tswane) %>% rbind(In_tswane)
+
+Ec_gridwane <- read_csv("../Data/ODE Supplement/Ecuador_grid_da base.wane.csv")
+
+```
+
+#### Plot S36A
+
+```{r}
+mycolors <- rev(pnw_palette("Moth", n = 11))
+
+dataPlaces <- ODE_tswane %>% 
+  select(cp, base.imm, country) %>% 
+  mutate(cp = as.numeric(cp), base.imm = as.numeric(base.imm)) %>%
+  distinct() %>% 
+  filter(country == "Ecuador")
+
+Ec_grid_noboostwane <- Ec_gridwane %>% 
+  filter(Booster == "Bivalent") %>% ## just grab one set of runs
+  mutate(base.imm = as.numeric(base.imm), cp= as.numeric(cp))%>%
+  mutate(relax = case_when(relax == 0.1 ~ "110% Infectiousness",
+                           relax == 0.3 ~ "130% Infectiousness")) %>%
+  mutate(deaths_10k = deaths_100k_comp/10) %>%
+  mutate(Booster = "No booster") %>% 
+  select(base.imm, cp, relax, deaths_10k, Booster)
+
+S36A <- Ec_gridwane  %>% 
+  mutate(base.imm = as.numeric(base.imm), cp= as.numeric(cp))%>%
+  mutate(relax = case_when(relax == 0.1 ~ "110% Infectiousness",
+                           relax == 0.3 ~ "130% Infectiousness")) %>%
+  mutate(deaths_10k = deaths_100k/10)  %>% 
+  select(base.imm, cp, relax, deaths_10k, Booster) %>%
+  rbind(Ec_grid_noboostwane) %>%
+      filter(base.imm <= 0.9) %>%
+  ggplot(aes(x = base.imm, y = cp)) + theme_classic() +
+  geom_tile(aes(fill = deaths_10k)) + facet_grid(Booster~relax) + 
+  geom_point(data = dataPlaces, color= "black", fill = "black", size = 2) +
+  scale_fill_stepsn("Deaths per 10,000",colors=mycolors,
+                    breaks = seq(0,12,2), limits=c(0,12),
+                    labels =c(0, 2, 4,6,8,10,12)) +
+  guides(fill = guide_colourbar(title.position="top", title.hjust = 0.5)) + 
+  scale_y_continuous("Cross protection",labels = 
+          scales::percent_format(accuracy = 1), 
+          breaks = c(0,0.3,0.6,0.9), expand = c(0,0)) +
+  scale_x_continuous("Prior infection",labels = 
+          scales::percent_format(accuracy = 1), 
+          breaks = c(0,0.3,0.6,0.9), expand = c(0,0)) +
+  ggtitle("Deaths per 10,000 - 75% waned","         Ecuador-like") +
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        plot.margin = unit(c(t=0.2, r=0.2, b=0.2, l=0.2), "cm"),
+        legend.key.width= unit(1.2, 'cm'),
+        legend.position = "none", 
+        plot.title.position = "plot",
+        legend.title = element_text(size = 11, color = "black"),
+        legend.text = element_text(size = 9, color = "black"),
+        strip.text.x = element_text(colour = "black", size = 11, hjust = 0),
+        strip.text.y = element_text(colour = "black", size = 10, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.3, "cm"), aspect.ratio=1)
+S36A
+```
+
+#### Plot S36B
+
+```{r}
+In_gridwane <- read_csv("../Data/ODE Supplement/India_grid_da base.wane.csv")
+
+dataPlaces <- ODE_tswane %>% 
+  select(cp, base.imm, country) %>% 
+  mutate(cp = as.numeric(cp), base.imm = as.numeric(base.imm)) %>%
+  distinct() %>% 
+  filter(country == "India")
+
+In_grid_noboostwane <- In_gridwane %>% 
+  filter(Booster == "Bivalent") %>% ## just grab one set of runs
+  mutate(base.imm = as.numeric(base.imm), cp= as.numeric(cp))%>%
+  mutate(relax = case_when(relax == 0.1 ~ "110% Infectiousness",
+                           relax == 0.3 ~ "130% Infectiousness")) %>%
+  mutate(deaths_10k = deaths_100k_comp/10) %>%
+  mutate(Booster = "No booster") %>% 
+  select(base.imm, cp, relax, deaths_10k, Booster)
+
+S36B <- In_gridwane  %>% 
+  mutate(base.imm = as.numeric(base.imm), cp= as.numeric(cp))%>%
+  mutate(relax = case_when(relax == 0.1 ~ "110% Infectiousness",
+                           relax == 0.3 ~ "130% Infectiousness")) %>%
+  mutate(deaths_10k = deaths_100k/10)  %>% 
+  select(base.imm, cp, relax, deaths_10k, Booster) %>%
+  rbind(In_grid_noboostwane) %>%
+      filter(base.imm <= 0.9) %>%
+  ggplot(aes(x = base.imm, y = cp)) + theme_classic() +
+  geom_tile(aes(fill = deaths_10k)) + facet_grid(Booster~relax) + 
+  geom_point(data = dataPlaces, color= "black", fill = "black", size = 2) +
+  scale_fill_stepsn("Deaths per 10,000",colors=mycolors,
+                    breaks = seq(0,12,2), limits=c(0,12),
+                    labels =c(0, 2, 4,6,8,10,12)) +
+  guides(fill = guide_colourbar(title.position="top", title.hjust = 0.5)) + 
+  scale_y_continuous("Cross protection",labels = 
+          scales::percent_format(accuracy = 1), 
+          breaks = c(0,0.3,0.6,0.9), expand = c(0,0)) +
+  scale_x_continuous("Prior infection",labels = 
+          scales::percent_format(accuracy = 1), 
+          breaks = c(0,0.3,0.6,0.9), expand = c(0,0)) +
+  ggtitle("","         India-like") +
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        plot.margin = unit(c(t=0.2, r=0.2, b=0.2, l=0.2), "cm"),
+        legend.key.width= unit(1.2, 'cm'),
+        legend.position = "none", 
+        plot.title.position = "plot",
+        legend.title = element_text(size = 11, color = "black"),
+        legend.text = element_text(size = 9, color = "black"),
+        strip.text.x = element_text(colour = "black", size = 11, hjust = 0),
+        strip.text.y = element_text(colour = "black", size = 10, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.3, "cm"), aspect.ratio=1)
+S36B
+```
+
+
+#### Plot S36C
+
+```{r}
+Ma_gridwane <- read_csv("../Data/ODE Supplement/Malaysia_grid_da base.wane.csv")
+
+dataPlaces <- ODE_tswane %>% 
+  select(cp, base.imm, country) %>% 
+  mutate(cp = as.numeric(cp), base.imm = as.numeric(base.imm)) %>%
+  distinct() %>% 
+  filter(country == "Malaysia")
+
+Ma_grid_noboostwane <- Ma_gridwane %>% 
+  filter(Booster == "Bivalent") %>% ## just grab one set of runs
+  mutate(base.imm = as.numeric(base.imm), cp= as.numeric(cp))%>%
+  mutate(relax = case_when(relax == 0.1 ~ "110% Infectiousness",
+                           relax == 0.3 ~ "130% Infectiousness")) %>%
+  mutate(deaths_10k = deaths_100k_comp/10) %>%
+  mutate(Booster = "No booster") %>% 
+  select(base.imm, cp, relax, deaths_10k, Booster)
+
+
+S36C <- Ma_gridwane  %>% 
+  mutate(base.imm = as.numeric(base.imm), cp= as.numeric(cp))%>%
+  mutate(relax = case_when(relax == 0.1 ~ "110% Infectiousness",
+                           relax == 0.3 ~ "130% Infectiousness")) %>%
+  mutate(deaths_10k = deaths_100k/10)  %>% 
+  select(base.imm, cp, relax, deaths_10k, Booster) %>%
+  rbind(Ma_grid_noboostwane) %>%
+      filter(base.imm <= 0.9) %>%
+  ggplot(aes(x = base.imm, y = cp)) + theme_classic() +
+  geom_tile(aes(fill = deaths_10k)) + facet_grid(Booster~relax) +
+  geom_point(data = dataPlaces, color= "black", fill = "black", size = 2) +
+  scale_fill_stepsn("Deaths per 10,000",colors=mycolors,
+                    breaks = seq(0,12,2), limits=c(0,12),
+                    labels =c(0, 2, 4,6,8,10,12)) +
+  guides(fill = guide_colourbar(title.position="top", title.hjust = 0.5)) + 
+  scale_y_continuous("Cross protection",labels = 
+          scales::percent_format(accuracy = 1), 
+          breaks = c(0,0.3,0.6,0.9), expand = c(0,0)) +
+  scale_x_continuous("Prior infection",labels = 
+          scales::percent_format(accuracy = 1), 
+          breaks = c(0,0.3,0.6,0.9), expand = c(0,0)) +
+  ggtitle("","         Malaysia-like") +
+  theme(axis.text = element_text(size = 11, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        axis.line = element_blank(),
+        axis.ticks = element_line(color = "black"),
+        plot.title = element_text(colour = "black", size = 13.5, face = "bold"),
+        plot.subtitle = element_text(colour = "black", size = 12.5),
+        plot.margin = unit(c(t=0.2, r=0.2, b=0.2, l=0.2), "cm"),
+        legend.key.width= unit(0.5, 'cm'),
+        legend.position = "right", 
+        plot.title.position = "plot",
+        legend.title = element_text(size = 11, color = "black"),
+        legend.text = element_text(size = 9, color = "black"),
+        strip.text.x = element_text(colour = "black", size = 11, hjust = 0),
+        strip.text.y = element_text(colour = "black", size = 10, hjust = 0),
+        strip.background = element_rect(colour="white", fill="white"),
+        panel.border = element_rect(colour = "black", fill=NA),
+        panel.spacing = unit(0.3, "cm"), aspect.ratio=1)
+S36C
+```
+
+```{r}
+S36 <- plot_grid(S36A,S36B,S36C, nrow = 1, rel_widths = c(1,1,1.4))
+ggsave("../Supplement_June2024/FigS36.pdf", S36, height = 6, width = 14)
+```
