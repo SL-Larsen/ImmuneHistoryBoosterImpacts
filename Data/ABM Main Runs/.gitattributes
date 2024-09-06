@@ -2,3 +2,8 @@ dataAll.zip filter=lfs diff=lfs merge=lfs -text
 dataHistories.zip filter=lfs diff=lfs merge=lfs -text
 dataHistories899.csv.zip filter=lfs diff=lfs merge=lfs -text
 keyTimes.zip filter=lfs diff=lfs merge=lfs -text
+output_files_AS.zip filter=lfs diff=lfs merge=lfs -text
+output_files_AS2.zip filter=lfs diff=lfs merge=lfs -text
+output_files_AS32.zip filter=lfs diff=lfs merge=lfs -text
+output_files_AS3.zip filter=lfs diff=lfs merge=lfs -text
+output_files_AS4.zip filter=lfs diff=lfs merge=lfs -text
