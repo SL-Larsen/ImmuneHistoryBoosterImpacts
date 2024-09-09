@@ -1,0 +1,13 @@
+history,WT,Delta,Omicron,Omicron_star,Bivalent_penalty,Monovalent_WTpenalty,Monovalent_Ompenalty,Bivalent_efficacy,Monovalent_WTefficacy,Bivalent_endpoint,Monovalent_WTendpoint,Monovalent_Omefficacy,Monovalent_Omendpoint,Bivalent_penalty_Omicron,Monovalent_WTpenalty_Omicron,Monovalent_Ompenalty_Omicron,Bivalent_efficacy_Omicron,Monovalent_WTefficacy_Omicron,Bivalent_endpoint_Omicron,Monovalent_WTendpoint_Omicron,Monovalent_Omefficacy_Omicron,Monovalent_Omendpoint_Omicron
+Delta,0.61,0.33,0.87,0.97,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+Delta_vaccine,0.11,0.3,0.62,0.72,0.22,0.52,0.52,0.27,0.54,0.01,0.28,0.54,0.28,0.07,0.42,0.32,0.12,0.44,0,0.18,0.34,0.08
+Omicron,0.85,0.95,0.4,0.5,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+Omicron_star,0.95,1,0.5,0.4,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+Omicron_star_vaccine,0.15,0.32,0.56,0.46,0.02,0.14,0.42,0.01,0.28,0.01,0.28,0.28,0.28,0,0.04,0.22,0,0.18,0,0.18,0.08,0.08
+Omicron_vaccine,0.05,0.22,0.46,0.56,0.12,0.24,0.52,0.11,0.38,0.01,0.28,0.38,0.28,0,0.14,0.32,0,0.28,0,0.18,0.18,0.08
+Vaccine,0.58,0.75,0.83,0.93,0.51,0.76,0.76,0.48,0.75,0.01,0.28,0.75,0.28,0.36,0.66,0.56,0.33,0.65,0,0.18,0.55,0.08
+WT,0.41,0.62,0.92,1,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+WT_vaccine,0.32,0.48,0.75,0.85,0.41,0.81,0.53,0.4,0.67,0.01,0.28,0.67,0.28,0.26,0.71,0.33,0.25,0.57,0,0.18,0.47,0.08
+length 2,0.16,0.33,0.6,0.65,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+length 3,0.1,0.19,0.32,0.35,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+length 4+,0.05,0.05,0.05,0.05,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
