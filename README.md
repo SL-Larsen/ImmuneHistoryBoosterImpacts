@@ -1,13 +1,20 @@
 # Immune history influences SARS-CoV-2 booster impacts: the role of efficacy and redundancy
 Code and data for: "Immune history influences SARS-CoV-2 booster impacts: the role of efficacy and redundancy"
 
-All codes and data necessary to produce simulation data, aggregate and analyse this data, and produce the figures for this paper are included. This code can be run with R versions 4.2.1-4.4.1 and Python versions 3.8.13-3.12.4. Raw simulation data for the History Specific Model is included instead of aggregated simulation data, as these files are extremely large and not storable by GitHub (e.g. individual variant-specific immune histories over time for thousands of simulations). These aggregate data can be generated with "Larsen_et_al_Analysis.Rmd". These data can also be made available to individuals upon reasonable request, but will not be stored in a public repository. 
+All codes and data necessary to produce simulation data, aggregate and analyse this data, and produce the figures for this paper are included. 
+
+## Requirements
+This code can be run with R versions 4.2.1-4.4.1 and Python versions 3.8.13-3.12.4.
+
+## Running the Code
+Raw simulation data for the History Specific Model is included instead of aggregated simulation data, as these files are extremely large and not storable by GitHub (e.g. individual variant-specific immune histories over time for thousands of simulations). These aggregate data can be generated with "Larsen_et_al_Analysis.Rmd". These data can also be made available to individuals upon reasonable request, but will not be stored in a public repository. 
 
 "antigenicSin" files contain Python code to produce History Specific Model simulation data. These are written to run on a high-performance computer by reading off of an array of simulation parameters which we have included in the "Data" folder. To test this code on your local computer, we recommend that you run only 1 replicate per scenario as the expected run time across all scenarios and replicates included in the paper is several days to 1 week. Folders marked with "ODE SA" contain R code to run the Hybrid Immunity Model, and the expected run time is 20 minutes on your local computer.  Use "Larsen_et_al_Analysis.Rmd" to aggregate simulation data into files for main ("Larsen_et_al_Main.Rmd", "Larsen_et_al_Supplement.Rmd") and supplementary figures. 
 
-About our sources: Neutralizing antibody titers data were obtained from [1,2]. SARS-CoV-2 household secondary attack rates where obtained from [3]. Population estimates and projections come from census data [4]. Reported cases were downloaded from the WHO portal [5]. Country-specific contact matrices were obtained from [6]. Estimates of relative mobility by SES where obtained from [7]. Within-SES contact vs. across-SES were inferred using data from [8, 9]. SES-stratified vaccination rates were obtained from [10]. Booster coverage was downloaded from Our World Data website [11]. Monovalent booster efficacy values with respect to the bivalent booster were obtained from [12, 13]. Vaccine efficacy values used to parameterize the hybrid-immunity model were obtained from [14,15, 16, 17]. 
+## Data Sources
+Neutralizing antibody titers data were obtained from [1,2]. SARS-CoV-2 household secondary attack rates where obtained from [3]. Population estimates and projections come from census data [4]. Reported cases were downloaded from the WHO portal [5]. Country-specific contact matrices were obtained from [6]. Estimates of relative mobility by SES where obtained from [7]. Within-SES contact vs. across-SES were inferred using data from [8, 9]. SES-stratified vaccination rates were obtained from [10]. Booster coverage was downloaded from Our World Data website [11]. Monovalent booster efficacy values with respect to the bivalent booster were obtained from [12, 13]. Vaccine efficacy values used to parameterize the hybrid-immunity model were obtained from [14,15, 16, 17]. 
 
-References: 
+## References
 
 [1] Manali, M., Bissett, L. A., Amat, J. A., Logan, N., Scott, S., Hughes, E. C., ... & Murcia, P. R. (2023). SARS-CoV-2 evolution and patient immunological history shape the breadth and potency of antibody-mediated immunity. The Journal of infectious diseases, 227(1), 40-49.
 
