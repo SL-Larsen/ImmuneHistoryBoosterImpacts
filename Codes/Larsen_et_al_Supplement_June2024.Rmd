@@ -264,7 +264,7 @@ S2 <- dataS2 %>%
   #            axes = "all", remove_labels = "all") + 
   scale_x_date("Date", expand = c(0,0), date_breaks = "4 month", 
                date_labels =  "%b %Y") + 
-  labs(title = "Infections pre-Omicron*", 
+  labs(title = "Infections pre-Variant X*", 
         subtitle = "History specific model") + #, "Variant-specific model") +
   guides(linetype = guide_legend(override.aes = list(alpha = 1, fill=NA))) +
   scale_linetype_manual("Infectiousness", values = c("solid","dashed")) +
@@ -466,7 +466,7 @@ vax_trends_model_star <- read_csv("../Data/ABM Supplement/supp2-vaccine_star/dat
   scale_y_continuous("Vaccinated (%)", limits = c(0,100)) +
   scale_x_continuous("Days since vaccination started", 
                      limits = c(0,820), breaks = c(0,200,400,600, 800)) +
-  ggtitle("HSM vaccination rates", "Continue through Omicron*")+
+  ggtitle("HSM vaccination rates", "Continue through Variant X")+
   guides(shape = guide_legend(override.aes = list(size=0.8, alpha = 0.6)), 
          color = guide_legend(order = 1)) + 
     theme(axis.text = element_text(size = 14, color = "black"),
@@ -929,7 +929,7 @@ S18 <- dataS18 %>%
   scale_color_manual("Country", values = c("#05878a", "#5a175d", "#dd9933")) + 
   scale_y_continuous("Boosted (% of vaccinated)", limits = c(0,100)) +
   scale_x_continuous("Days since boosting started", limits = c(0,260)) +  
-  ggtitle("Hybrid immunity model", "Boosting 60 days before Omicron*") +
+  ggtitle("Hybrid immunity model", "Boosting 60 days before Variant X") +
   theme(axis.text = element_text(size = 11, color = "black"), #  angle = 90
         axis.title.x = element_text(size = 12, color = "black",vjust = -1),
         axis.title.y = element_text(size = 12, color = "black",vjust = +3),
@@ -1270,7 +1270,7 @@ S23 <- data23 %>%
   labs(y='Infections per 10k') + 
   scale_x_date("Date", expand = c(0,0), date_breaks = "1 month", 
                date_labels =  "%b %Y") + 
-  ggtitle("Hybrid immunity model", "Boost 60 days prior to Omicron*") +
+  ggtitle("Hybrid immunity model", "Boost 60 days prior to Variant X") +
   theme(axis.text = element_text(size = 11, color = "black"), #  angle = 90
         #axis.title.x = element_text(size = 12, color = "black",vjust = -1),
         axis.text.x=element_text(angle=60, hjust=1),
@@ -1336,7 +1336,7 @@ S24 <- dataS24 %>%
   scale_color_manual("Country", values = c("#05878a", "#5a175d", "#dd9933")) + 
   scale_y_continuous("Boosted (% of vaccinated)", limits = c(0,100)) +
   scale_x_continuous("Days since boosting started", limits = c(0,210)) +
-  ggtitle("Hybrid immunity model", "Boosting 0 days before Omicron*")+
+  ggtitle("Hybrid immunity model", "Boosting 0 days before Variant X")+
   theme(axis.text = element_text(size = 11, color = "black"), #  angle = 90
         axis.title.x = element_text(size = 12, color = "black",vjust = -1),
         axis.title.y = element_text(size = 12, color = "black",vjust = +3),
@@ -1400,7 +1400,7 @@ S25 <- dataS25 %>%
   labs(y='Infections per 10k') + 
   scale_x_date("Date", expand = c(0,0), date_breaks = "1 month", 
                date_labels =  "%b %Y") + 
-  ggtitle("Hybrid immunity model", "Boost 0 days prior to Omicron*") +
+  ggtitle("Hybrid immunity model", "Boost 0 days prior to Variant X") +
   theme(axis.text = element_text(size = 11, color = "black"), #  angle = 90
         #axis.title.x = element_text(size = 12, color = "black",vjust = -1),
         axis.text.x=element_text(angle=60, hjust=1),
@@ -1460,6 +1460,8 @@ dataS26 <- df_AvertedODE %>%
 mycolors <- rev(c("#BD451D","#428740"))
 
 S26 <- dataS26 %>%
+    mutate(boost.start.time = gsub("omicron*", "Variant X", boost.start.time)) %>%
+  mutate(boost.start.time = substr(boost.start.time, 0, nchar(boost.start.time)-1)) %>%
   ggplot(aes(x=boost.speed, y=deathsaverted_per10k, fill=Booster))+
   geom_point(aes(color=Booster, shape = boost.start.time), size = 2)+
   facet_rep_grid(relativeFOI~country)+

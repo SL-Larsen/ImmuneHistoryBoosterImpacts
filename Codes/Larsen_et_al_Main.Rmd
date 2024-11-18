@@ -309,16 +309,16 @@ nb.cols <- 12
 mycolors <- colorRampPalette(brewer.pal(6, "Blues"))(nb.cols)
 
 heat_map_data <- serotypes %>% select(history, WT, Delta, Omicron, Omicron_star) %>% 
-  mutate(history= gsub("_star", "*", history),
-         history = gsub("_", " + ", history)) %>% 
+  mutate(history = gsub("Omicron_star", "Variant X", history),
+         history = gsub("_", " + ", history)) %>%
   pivot_longer(WT:Omicron_star, names_to = "wave", values_to = "neg_protection") %>% 
-  mutate(wave = gsub("_star", "*", wave)) %>% 
-  mutate(wave = fct_relevel(wave, c("WT", "Delta", "Omicron", "Omicron*"))) %>%
+  mutate(wave = gsub("Omicron_star", "Variant X", wave)) %>% 
+  mutate(wave = fct_relevel(wave, c("WT", "Delta", "Omicron", "Variant X"))) %>%
   mutate(history = fct_relevel(history, 
                                rev(c("Vaccine","WT", "WT + vaccine", 
                                      "Delta", "Delta + vaccine",
                                      "Omicron", "Omicron + vaccine",
-                                     "Omicron*", "Omicron* + vaccine",
+                                     "Variant X", "Variant X + vaccine",
                                      "length 2", "length 3", "length 4+")))) %>%
   mutate(protection = 100*(1-neg_protection)) %>% 
   ggplot(aes(x = wave, y = history, fill = protection)) + 
@@ -442,8 +442,14 @@ colors <- c("#BC8400","#7C2529","#005B40")
 #rev(met.brewer("Klimt"))[c(3,14)]
 sort_text <- tibble(booster_type = c("Monovalent, 72%", "Bivalent, 99%"), endpoint = c(1-0.28, 1-0.01)) %>% mutate(booster_type = fct_relevel(booster_type, "Monovalent, 72%"))
 
-plot2A <- data_protection %>% mutate(history = fct_relevel(history, 
-        c("Omicron* + vaccine", "Omicron + vaccine","Delta + vaccine", 
+plot2A <- data_protection %>% 
+  mutate(history = case_when(
+    history == "Omicron*" ~ "Variant X",
+    history == "Omicron* + vaccine" ~ "Variant X + vaccine",
+    .default = history
+  )) %>%
+  mutate(history = fct_relevel(history, 
+        c("Variant X + vaccine", "Omicron + vaccine","Delta + vaccine", 
           "WT + vaccine","Vaccine only"))) %>% 
   mutate(Scenario = recode(scenario, endpoint = "Same endpoint",
     efficacy = "Same efficacy", penalty = "History dependent",
@@ -544,10 +550,10 @@ plot2B <- dat2B %>%
     country == "Malaysia" ~ "Malaysia-like"
   )) %>%
   ggplot(aes(x = time, fill = booster, 
-            color = booster, linetype = SAR, 
+            color = booster, linetype = SAR,
             group = interaction(country, scenario, booster, SAR))) +
-  geom_ribbon(aes(ymin = Lower, ymax = Upper), alpha = 0.5) + 
-  geom_line(aes(y=Mean), alpha = 0) + theme_classic() + 
+  geom_ribbon(aes(ymin = Lower, ymax = Upper), alpha = 0.4, color = NA) + 
+  geom_line(aes(y=Mean), alpha = 1, size = 1) + theme_classic() + 
   scale_fill_manual("Booster type", values = colors) +
   scale_color_manual("Booster type", values = colors) + 
   ylab("Infections per 10,000") +
@@ -557,10 +563,8 @@ plot2B <- dat2B %>%
   country == "India" ~ scale_y_continuous(limits = c(0, NA)),
   country == "Malaysia" ~ scale_y_continuous(limits = c(0, NA), 
                                              breaks = c(0,30,60,90,120)))) + 
-  #scale_y_continuous(, limits = c(0,NA)) + # expand = c(0,0) 
-  #scale_x_continuous("Time (months)", expand = c(0,0.5), breaks = c(30,32,34,36)) +
     scale_x_date("Date", expand = c(0,0), date_breaks = "1 month", date_labels =  "%b %Y") + 
-  ggtitle("Infections during Omicron* - History specific model") + #, "Variant-specific model") +
+  ggtitle("Infections during Variant X - History specific model") + #, "Variant-specific model") +
   guides(linetype = guide_legend(override.aes = list(alpha = 1, fill=NA))) +
   scale_linetype_manual("Infectiousness", values = c("solid", "dashed")) +
   theme(axis.text = element_text(size = 11, color = "black"),
@@ -722,7 +726,7 @@ plot3A <- ODE_ts %>%
   #scale_y_continuous("Infections per 10,000") + 
   #scale_x_continuous("Time (months)", expand = c(0,0.5), breaks = c(30,32,34,36)) +
       scale_x_date("Date", expand = c(0,0), date_breaks = "1 month", date_labels =  "%b %Y") + 
-  ggtitle("Infections during Omicron* - Hybrid immunity model") + 
+  ggtitle("Infections during Variant X - Hybrid immunity model") + 
   theme(axis.text = element_text(size = 11, color = "black"),
         axis.text.x=element_text(angle=60, hjust=1),
         axis.title = element_text(size = 12, color = "black"),
@@ -1167,4 +1171,11 @@ plot4 <- plot_grid(plot4E,plot4I,plot4M, nrow = 1, rel_widths = c(1,1,1.505))
 ggsave("../Main/Figure4.pdf", plot4, height = 6, width = 9.4)
 
 ```
+
+
+
+
+
+
+
 
