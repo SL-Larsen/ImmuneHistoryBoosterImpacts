@@ -21,10 +21,10 @@ sweep_fun <- function(t = t){
   max.boost_l=0.87
   #max.boost.child=c(0.1, 0.9)
   #cp=c(0.2946, 0.3818, 0.3159) #old estimates
-  cp=0.665
+  cp=0.664
   #relax=seq(from=0, to=2, by=0.1)
   relax=c(0, 0.1, 0.3)
-  base.imm=0.781
+  base.imm=0.782
   sd0=0.7088
   wanevar=c(1/300)
   #pboost_h=c(0, 0.03457, 0.1423)

@@ -386,11 +386,11 @@ plotTile1 <- dataHistories %>%
     )
   )) %>% 
   mutate(country = case_when(
-    country == "Ecuador" ~ "Ecuador-like",
-    country == "India" ~ "India-like",
-    country == "Malaysia" ~ "Malaysia-like"
+    country == "Ecuador" ~ "High Omicron Wave",
+    country == "India" ~ "High Delta Wave",
+    country == "Malaysia" ~ "Mixed Variant Waves"
   )) %>%
-  
+      mutate(country = fct_relevel(country, c("High Omicron Wave", "High Delta Wave", "Mixed Variant Waves"))) %>%
   ggplot(aes(x = time, y = history_counts, fill = history_types, 
              color = history_types)) + theme_bw() +
   geom_bar(position="stack", stat = "identity")  +
@@ -545,10 +545,11 @@ get_peaks <- dat2B %>%
   
 plot2B <- dat2B %>%
     mutate(country = case_when(
-    country == "Ecuador" ~ "Ecuador-like",
-    country == "India" ~ "India-like",
-    country == "Malaysia" ~ "Malaysia-like"
+    country == "Ecuador" ~ "High Omicron Wave",
+    country == "India" ~ "High Delta Wave",
+    country == "Malaysia" ~ "Mixed Variant Waves"
   )) %>%
+      mutate(country = fct_relevel(country, c("High Omicron Wave", "High Delta Wave", "Mixed Variant Waves"))) %>%
   ggplot(aes(x = time, fill = booster, 
             color = booster, linetype = SAR,
             group = interaction(country, scenario, booster, SAR))) +
@@ -621,10 +622,11 @@ dat2C <- df_avert_rr2 %>%
 
 plot2C <- dat2C %>%
     mutate(country = case_when(
-    country == "Ecuador" ~ "Ecuador-like",
-    country == "India" ~ "India-like",
-    country == "Malaysia" ~ "Malaysia-like"
+    country == "Ecuador" ~ "High Omicron Wave",
+    country == "India" ~ "High Delta Wave",
+    country == "Malaysia" ~ "Mixed Variant Waves"
   )) %>%
+      mutate(country = fct_relevel(country, c("High Omicron Wave", "High Delta Wave", "Mixed Variant Waves"))) %>%
   ggplot(aes(x = SAR, fill = Booster, color = Booster,
                      group = interaction(Booster, SAR, Scenario))) + 
   geom_bar(aes(y=Mean), stat="identity", position=position_dodge(0.7),  
@@ -632,13 +634,13 @@ plot2C <- dat2C %>%
   geom_errorbar(aes(ymin  = Lower, ymax  = Upper),
            stat="identity", position=position_dodge(0.7),  
            size = 0.6, width = 0.3, show.legend=FALSE) + 
-  geom_text(aes(label = round(Mean, 2), y = Upper + 0.2), position=position_dodge(0.7), size = 3) + ## this line adds the labels
+  geom_text(aes(label = round(Mean, 2), y = Upper + 0.1), position=position_dodge(0.7), size = 3) + ## this line adds the labels
   scale_fill_manual("Booster", values = colors) +
   scale_color_manual("Booster", values = colors) +
   facet_wrap(~country, scales = "free", nrow = 1) +
   #scale_y_continuous("Deaths averted per 10,000", limits = c(0,4.7), 
                      #expand = expansion(mult = c(0,0))) +
-  scale_y_continuous("Deaths averted per 10,000", limits = c(0,5.2), 
+  scale_y_continuous("Deaths averted per 10,000", limits = c(0,2.5), 
                      expand = expansion(mult = c(0,0))) +
   scale_x_discrete("Infectiousness relative to Omicron") +
   ggtitle("Deaths averted - History specific model") + #, subtitle = "Variant-specific model") + 
@@ -700,10 +702,11 @@ plot3A <- ODE_ts %>%
   filter(name== "Iall") %>% 
   mutate(Infectiousness = SAR) %>%
     mutate(country = case_when(
-    country == "Ecuador" ~ "Ecuador-like",
-    country == "India" ~ "India-like",
-    country == "Malaysia" ~ "Malaysia-like"
+    country == "Ecuador" ~ "High Omicron Wave",
+    country == "India" ~ "High Delta Wave",
+    country == "Malaysia" ~ "Mixed Variant Waves"
   )) %>%
+        mutate(country = fct_relevel(country, c("High Omicron Wave", "High Delta Wave", "Mixed Variant Waves"))) %>%
   ## don't want infections to be *100, want to use percent scale
   ggplot(aes(x = time,y=10000*value/(population), color = booster, group = interaction(country, booster, SAR))) +
   geom_line(aes(linetype = Infectiousness), size= 1.2) +
@@ -717,10 +720,10 @@ plot3A <- ODE_ts %>%
   #                                         breaks = c(0,70,140,210,280,350,420)),
   # country == "Malaysia" ~ scale_y_continuous(limits = c(0, NA), 
   #                                            breaks = c(0,30,60,90,120, 150)))) + 
-    country == "Ecuador-like" ~ scale_y_continuous(limits = c(0, 85), breaks = c(0,20,40,60,80)),
-  country == "India-like" ~ scale_y_continuous(limits = c(0, 210),
+    country == "High Omicron Wave" ~ scale_y_continuous(limits = c(0, 85), breaks = c(0,20,40,60,80)),
+  country == "High Delta Wave" ~ scale_y_continuous(limits = c(0, 210),
                                           breaks = c(0,50,100,150,200)),
-  country == "Malaysia-like" ~ scale_y_continuous(limits = c(0, 120), 
+  country == "Mixed Variant Waves" ~ scale_y_continuous(limits = c(0, 120), 
                                              breaks = c(0,30,60,90,120)))) + 
 
   #scale_y_continuous("Infections per 10,000") + 
@@ -778,8 +781,8 @@ plot3BE <- Ec_grid  %>%
   #geom_text_repel(data = dataPlaces, color= "black", fill = "white", size = 2, aes(label = country)) +
   theme_classic() +
   scale_fill_stepsn("Deaths averted per 10,000",colors=mycolors,
-                    breaks = seq(0,2.4,0.3), limits=c(0,2.4),
-                    labels =c(0,"",0.6,"",1.2,"",1.8,"",2.4)) +
+                    breaks = seq(0,1.2,0.15), limits=c(0,1.2),
+                    labels =c(0,"",0.3,"",0.6,"",0.9,"",1.2)) +
   # scale_fill_stepsn("Deaths averted per 10,000",colors=mycolors, 
   #                   breaks = seq(0,1.6,0.1), limits=c(0,1.6),
   #                   labels =c(0,"",0.2,"",0.4,"",0.6,"",0.8,
@@ -792,7 +795,7 @@ plot3BE <- Ec_grid  %>%
   scale_x_continuous("Prior infection",labels = 
           scales::percent_format(accuracy = 1), 
           breaks = c(0,0.3,0.6,0.9), expand = c(0,0)) +
-  ggtitle("Deaths averted - Hybrid immunity model","         Ecuador-like") +
+  ggtitle("Deaths averted - Hybrid immunity model","         High Omicron Wave") +
     theme(axis.text = element_text(size = 11, color = "black"),
         axis.title = element_text(size = 12, color = "black"),
         axis.line = element_blank(),
@@ -832,8 +835,8 @@ plot3BI <- In_grid %>%
   geom_point(data = dataPlaces, color= "black", fill = "black", size = 2) +
   #geom_text_repel(data = dataPlaces, color= "black", fill = "white", size = 2, aes(label = country)) +
   scale_fill_stepsn("Deaths averted per 10,000",colors=mycolors,
-                    breaks = seq(0,1.4,0.2), limits=c(0,1.4),
-                    labels =c(0,"",0.4,"",0.8,"",1.2,"")) +
+                    breaks = seq(0,0.7,0.1), limits=c(0,0.7),
+                    labels =c(0,"",0.2,"",0.4,"",0.6,"")) +
   # scale_fill_stepsn("Deaths averted per 10,000",colors=mycolors, 
   #                   breaks = seq(0,1.6,0.1), limits=c(0,1.6),
   #                   labels =c(0,"",0.2,"",0.4,"",0.6,"",0.8,
@@ -857,7 +860,7 @@ plot3BI <- In_grid %>%
         strip.background = element_rect(colour="white", fill="white"),
         panel.border = element_rect(colour = "black", fill=NA),
         panel.spacing = unit(0.3, "cm"), aspect.ratio=1)+
-  ggtitle(" ","India-like")
+  ggtitle(" ","High Delta Wave")
 plot3BI
 
 #mycolors <- met.brewer("VanGogh3", n = 10)
@@ -885,8 +888,8 @@ plot3BM <- Ma_grid %>%
   geom_point(data = dataPlaces, color= "black", fill = "black", size = 2) +
   #geom_text_repel(data = dataPlaces, color= "black", fill = "white", size = 2, aes(label = country)) +
   scale_fill_stepsn("Deaths averted per 10,000",colors=mycolors,
-                    breaks = seq(0,3.5,0.5), limits=c(0,3.5),
-                    labels =c(0,"",1.0,"",2.0,"",3.0,"")) +
+                    breaks = seq(0,1.75,0.25), limits=c(0,1.75),
+                    labels =c(0,"",0.5,"",1.0,"",1.5,"")) +
   # scale_fill_stepsn("Deaths averted per 10,000",colors=mycolors, 
   #                   breaks = seq(0,3.2,0.2), limits=c(0,3.2),
   #                   labels =c(0,"",0.4,"",0.8,"",1.2,"",1.6,
@@ -912,7 +915,7 @@ plot3BM <- Ma_grid %>%
         strip.background = element_rect(colour="white", fill="white"),
         panel.border = element_rect(colour = "black", fill=NA),
         panel.spacing = unit(0.3, "cm"), aspect.ratio=1)+
-  ggtitle(" ","Malaysia-like")
+  ggtitle(" ","Mixed Variant Waves")
 plot3BM
 ```
 
@@ -985,7 +988,7 @@ plot4E <- dat4E %>%
   scale_x_continuous("Prior infection",labels = 
           scales::percent_format(accuracy = 1), 
           breaks = c(0,0.3,0.6,0.9), expand = c(0,0)) +
-  ggtitle("Bivalent gains vs. boosting","         Ecuador-like") +
+  ggtitle("Bivalent gains vs. boosting","         High Omicron Wave") +
     theme(axis.text = element_text(size = 11, color = "black"),
         axis.title = element_text(size = 12, color = "black"),
         axis.line = element_blank(),
@@ -1054,7 +1057,7 @@ plot4I <- dat4I %>%
   scale_x_continuous("Prior infection",labels = 
           scales::percent_format(accuracy = 1), 
           breaks = c(0,0.3,0.6,0.9), expand = c(0,0)) +
-  ggtitle("","         India-like") +
+  ggtitle("","         High Delta Wave") +
     theme(axis.text = element_text(size = 11, color = "black"),
         axis.title = element_text(size = 12, color = "black"),
         axis.line = element_blank(),
@@ -1128,7 +1131,7 @@ plot4M <- dat4M %>%
   scale_x_continuous("Prior infection",labels = 
           scales::percent_format(accuracy = 1), 
           breaks = c(0,0.3,0.6,0.9), expand = c(0,0)) +
-  ggtitle("","         Malaysia-like") +
+  ggtitle("","         Mixed Variant Waves") +
     theme(axis.text = element_text(size = 11, color = "black"),
         axis.title = element_text(size = 12, color = "black"),
         axis.line = element_blank(),

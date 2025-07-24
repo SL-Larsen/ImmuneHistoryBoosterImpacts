@@ -1380,6 +1380,15 @@ countInfected_H, countInfected_L, variant)
 ## this is the current variant
 variant = 'Omicron'
 
+## Update IFR
+
+alphaL1_child =   alphaL1_child*0.5 ## death rate
+alphaL1_adult =   alphaL1_adult*0.5 ## death rate
+alphaL1_old =   alphaL1_old*0.5 ## death rate
+alphaH1_child =   alphaH1_child*0.5 ## death rate
+alphaH1_adult =   alphaH1_adult*0.5 ## death rate
+alphaH1_old =   alphaH1_old*0.5 ## death rate
+
 ## update secondary attack rate
 mu_child = 0.427 ## SAR for Omicron
 mu_adult = 0.427 ## SAR for Omicron

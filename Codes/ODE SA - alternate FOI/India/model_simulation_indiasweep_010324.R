@@ -263,7 +263,7 @@ model_sims <- function(i){
   
   #boost.adult<<-0
   SES.sev<-c(3.1, 2.4, 1) 
-  lowCFR<-0.2
+  lowCFR<-0.2*0.5 # cut CFR in half
   sd0<-sweep$sd[i]
   relax<-sweep$relax[i]
   
